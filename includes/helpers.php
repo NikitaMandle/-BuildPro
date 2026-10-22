@@ -5,13 +5,37 @@ const TABLES = [
   'categories' => ['name','image'],
   'products'   => ['category_id','name','description','price','unit','image'],
 ];
+
 function env($k, $d = null) {
-  static $e;
-  if ($e === null) { $e = []; $f = __DIR__.'/../.env';
-    if (is_file($f)) foreach (file($f, FILE_IGNORE_NEW_LINES|FILE_SKIP_EMPTY_LINES) as $l) {
-      if ($l[0]==='#' || !str_contains($l,'=')) continue; [$a,$b] = explode('=',$l,2); $e[trim($a)] = trim($b); } }
-  return $e[$k] ?? $d;
+    $value = getenv($k);
+
+    if ($value !== false) {
+        return $value;
+    }
+
+    static $e = null;
+
+    if ($e === null) {
+        $e = [];
+        $f = __DIR__ . '/../.env';
+
+        if (is_file($f)) {
+            foreach (file($f, FILE_IGNORE_NEW_LINES | FILE_SKIP_EMPTY_LINES) as $line) {
+                $line = trim($line);
+
+                if ($line === '' || str_starts_with($line, '#') || !str_contains($line, '=')) {
+                    continue;
+                }
+
+                [$key, $val] = explode('=', $line, 2);
+                $e[trim($key)] = trim($val);
+            }
+        }
+    }
+
+    return $e[$k] ?? $d;
 }
+
 function db() {
   static $p;
   if (!$p) $p = new PDO('mysql:host='.env('DB_HOST','localhost').';dbname='.env('DB_NAME').';charset=utf8mb4',
