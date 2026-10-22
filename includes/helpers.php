@@ -37,10 +37,18 @@ function env($k, $d = null) {
 }
 
 function db() {
-  static $p;
-  if (!$p) $p = new PDO('mysql:host='.env('DB_HOST','localhost').';dbname='.env('DB_NAME').';charset=utf8mb4',
-    env('DB_USER','root'), env('DB_PASS',''), [PDO::ATTR_ERRMODE=>PDO::ERRMODE_EXCEPTION, PDO::ATTR_DEFAULT_FETCH_MODE=>PDO::FETCH_ASSOC]);
-  return $p;
+$host = env('DB_HOST');
+$port = env('DB_PORT', '3306');
+$name = env('DB_NAME');
+$user = env('DB_USER');
+$pass = env('DB_PASS');
+
+$dsn = "mysql:host=$host;port=$port;dbname=$name;charset=utf8mb4";
+
+$pdo = new PDO($dsn, $user, $pass, [
+    PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
+    PDO::ATTR_DEFAULT_FETCH_MODE => PDO::FETCH_ASSOC,
+]);
 }
 function respond($d, $code=200) { http_response_code($code); header('Content-Type: application/json'); echo json_encode($d); exit; }
 function ok($data=null, $code=200) { respond(['success'=>true,'data'=>$data], $code); }
