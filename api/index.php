@@ -2,6 +2,7 @@
 session_set_cookie_params(['httponly'=>true,'samesite'=>'Lax']);
 session_start();
 require __DIR__.'/../includes/helpers.php';
+restore_session();
 $p = explode('/', trim($_GET['path'] ?? '', '/'));
 $res = $p[0]; $id = (int)($p[1] ?? 0); $sub = $p[1] ?? '';
 $m = $_SERVER['REQUEST_METHOD'];
@@ -21,9 +22,9 @@ $dispatch = function () use ($res, $id, $sub, $m) {
           if (!$u || !password_verify($secret, $u['pin_hash'])) fail('Invalid credentials', 401);
           $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
         }
-        session_regenerate_id(true); $_SESSION['auth'] = $a; ok($a);
+        session_regenerate_id(true); $_SESSION['auth'] = $a; remember_set($a); ok($a);
       }
-      if ($sub==='logout') { session_destroy(); ok(); }
+      if ($sub==='logout') { remember_clear(); session_destroy(); ok(); }
       if ($sub==='me') ok(me() ?? fail('Not logged in', 401));
       fail('Not found', 404);
 

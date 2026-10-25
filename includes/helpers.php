@@ -78,7 +78,9 @@ function clean($in, $upd, $req, $opt=[]) {
   foreach (array_merge($req,$opt) as $k) if (isset($in[$k]) && trim((string)$in[$k])!=='') $o[$k] = trim((string)$in[$k]);
   return $o;
 }
-function me() { return $_SESSION['auth'] ?? null; }
+// ADMIN_OPEN: when on (default), anyone is treated as admin without login. Set ADMIN_OPEN=0 in .env / Render env to lock it again.
+function admin_open() { return env('ADMIN_OPEN', '1') !== '0'; }
+function me() { return $_SESSION['auth'] ?? (admin_open() ? ['id'=>0,'name'=>'Admin','role'=>'admin'] : null); }
 function require_role(...$roles) { $m = me(); if (!$m) fail('Login required', 401); if (!in_array($m['role'],$roles)) fail('Forbidden', 403); return $m; }
 function upload_image($field, $old=null) {
   if (empty($_FILES[$field]) || $_FILES[$field]['error']===UPLOAD_ERR_NO_FILE) return $old;
@@ -128,4 +130,29 @@ function resource($t, $write, $sel, $validate, $filters, $id, $m) {
   if (in_array('image', TABLES[$t])) $d['image'] = upload_image('image', $old['image'] ?? null);
   if ($id) { crud_update($t,$id,$d); ok(crud_find($t,$id,$sel)); }
   ok(crud_find($t, crud_insert($t,$d), $sel), 201);
+}
+
+
+// ---------- "Stay logged in" (signed cookie, 30 days; survives server restarts) ----------
+function remember_key() { return hash('sha256', 'bp|'.env('ADMIN_USER').'|'.env('ADMIN_PASS').'|'.env('DB_PASS'), true); }
+function remember_set($a) {
+  $p = base64_encode(json_encode(['a'=>$a,'e'=>time()+30*86400]));
+  $https = !empty($_SERVER['HTTPS']) || ($_SERVER['HTTP_X_FORWARDED_PROTO'] ?? '')==='https';
+  setcookie('bp_remember', $p.'.'.hash_hmac('sha256',$p,remember_key()), ['expires'=>time()+30*86400,'path'=>'/','httponly'=>true,'samesite'=>'Lax','secure'=>$https]);
+}
+function remember_clear() { setcookie('bp_remember','',['expires'=>1,'path'=>'/']); }
+function restore_session() {
+  if (!empty($_SESSION['auth']) || empty($_COOKIE['bp_remember'])) return;
+  try {
+    [$p,$sig] = array_pad(explode('.', $_COOKIE['bp_remember'], 2), 2, '');
+    if (!hash_equals(hash_hmac('sha256',$p,remember_key()), $sig)) return;
+    $d = json_decode(base64_decode($p), true);
+    if (!is_array($d) || ($d['e'] ?? 0) < time()) return;
+    $a = $d['a'];
+    if ($a['id'] > 0) { // subadmin/user: must still exist; take latest name/role
+      $q = db()->prepare('SELECT id,name,role FROM users WHERE id=?'); $q->execute([$a['id']]); $u = $q->fetch();
+      if (!$u) return; $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
+    }
+    $_SESSION['auth'] = $a;
+  } catch (Throwable $e) { /* ignore, user just logs in again */ }
 }
