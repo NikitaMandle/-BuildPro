@@ -14,7 +14,10 @@ function toast(msg, err) { const t = document.createElement('div'); t.className 
 // Generic CRUD table + modal form. c = {title,res,cols,fields,edit,filter}
 function crud(root, c) {
   let list = [], fv = '';
-  const load = async () => { list = await api(c.res + (fv ? `?${c.filter.k}=${fv}` : '')); draw(); };
+  const load = async () => {
+    try { list = await api(c.res + (fv ? `?${c.filter.k}=${fv}` : '')); draw(); }
+    catch (e) { root.innerHTML = `<h2>${c.title}</h2><p style="color:#ff5470">${esc(e.message)}</p>`; }
+  };
   function draw() {
     root.innerHTML = `<div class="bar"><h2>${c.title}</h2>
       ${c.filter ? `<select id="f"><option value="">All</option>${c.filter.options().map(o => `<option value="${o.id}" ${o.id == fv ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
@@ -26,7 +29,7 @@ function crud(root, c) {
     if (c.edit) { $('#add', root).onclick = () => form();
       root.querySelectorAll('[data-e]').forEach(b => b.onclick = () => form(list.find(r => r.id == b.dataset.e)));
       root.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { if (!confirm('Delete?')) return;
-        try { await api(`${c.res}/${b.dataset.d}`, 'DELETE'); toast('Deleted'); load(); } catch (e) { toast(e.message, 1); } }); }
+        try { await api(`${c.res}/${b.dataset.d}`, 'DELETE'); toast('Deleted'); c.onChange?.(); load(); } catch (e) { toast(e.message, 1); } }); }
   }
   function form(row = {}) {
     const m = document.createElement('div'); m.className = 'modal';
@@ -37,7 +40,7 @@ function crud(root, c) {
       <div class="row"><button class="btn">Save</button><button type="button" class="btn ghost" id="x">Cancel</button></div></form>`;
     document.body.append(m); $('#x', m).onclick = () => m.remove();
     $('form', m).onsubmit = async e => { e.preventDefault();
-      try { await api(row.id ? `${c.res}/${row.id}` : c.res, row.id ? 'PUT' : 'POST', new FormData(e.target)); m.remove(); toast('Saved'); load(); }
+      try { await api(row.id ? `${c.res}/${row.id}` : c.res, row.id ? 'PUT' : 'POST', new FormData(e.target)); m.remove(); toast('Saved'); c.onChange?.(); load(); }
       catch (err) { toast(err.message, 1); } };
   }
   load(); return { load };

@@ -6,8 +6,9 @@ $p = explode('/', trim($_GET['path'] ?? '', '/'));
 $res = $p[0]; $id = (int)($p[1] ?? 0); $sub = $p[1] ?? '';
 $m = $_SERVER['REQUEST_METHOD'];
 if ($m==='POST' && isset($_POST['_method'])) $m = strtoupper($_POST['_method']);
+if ($m==='GET') session_write_close(); // reads don't write the session; don't block parallel requests
 
-try {
+$dispatch = function () use ($res, $id, $sub, $m) {
   switch ($res) {
     case 'auth':
       if ($sub==='login' && $m==='POST') {
@@ -53,6 +54,17 @@ try {
       }, ['category_id'], $id, $m);
 
     default: fail('Unknown resource', 404);
+  }
+};
+
+try {
+  try { $dispatch(); }
+  catch (PDOException $e) {
+    // Older database without users.username: add it once, then retry the same request
+    if ($e->getCode()==='42S22' && stripos($e->getMessage(), 'username') !== false) {
+      db()->exec('ALTER TABLE users ADD COLUMN username VARCHAR(30) NULL UNIQUE AFTER name');
+      $dispatch();
+    } else throw $e;
   }
 } catch (PDOException $e) {
   fail($e->getCode()==='23000' ? ($res==='users' ? 'Username or mobile already exists' : 'Duplicate value or invalid category') : 'Database error: '.$e->getMessage(), 422);

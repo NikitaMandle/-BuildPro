@@ -12,15 +12,15 @@
 <button class="btn ghost" data-t="users" id="ub" hidden>Users</button><button class="btn" id="out">Logout</button></aside><main id="m"></main></div>
 
 <script src="../assets/app.js"></script><script>
-let cats = [];
-const catOpts = () => cats; const refreshCats = async () => cats = await api('categories');
+let cats = [], catsStale = true;
+const catOpts = () => cats; const refreshCats = async () => { cats = await api('categories'); catsStale = false; };
 
 function showDashboard(me) {
   $('#f').hidden = true; $('#dash').hidden = false;
   $('#who').textContent = `${me.name} (${me.role})`;
   const canEdit = ['admin', 'subadmin'].includes(me.role); $('#ub').hidden = me.role !== 'admin';
   const views = {
-    cats: { title: 'Categories', res: 'categories', edit: canEdit, cols: [{ k: 'image', label: 'Image', img: 1 }, { k: 'name', label: 'Name' }],
+    cats: { title: 'Categories', res: 'categories', edit: canEdit, onChange: () => catsStale = true, cols: [{ k: 'image', label: 'Image', img: 1 }, { k: 'name', label: 'Name' }],
       fields: [{ k: 'name', label: 'Name' }, { k: 'image', label: 'Image', type: 'file', req: false }] },
     prods: { title: 'Products', res: 'products', edit: canEdit, filter: { k: 'category_id', options: catOpts },
       cols: [{ k: 'image', label: 'Image', img: 1 }, { k: 'name', label: 'Name' }, { k: 'category_id', label: 'Category', map: v => cats.find(c => c.id == v)?.name }, { k: 'price', label: 'Price ₹' }, { k: 'unit', label: 'Unit' }],
@@ -32,7 +32,11 @@ function showDashboard(me) {
         { k: 'gst', label: 'GST (15 chars)', attr: 'minlength="15" maxlength="15"' }, { k: 'pin', label: '4-digit PIN', type: 'password', attr: 'pattern="\\d{4}" maxlength="4" autocomplete="new-password"' },
         { k: 'role', label: 'Role', type: 'select', options: () => [{ id: 'subadmin', name: 'Subadmin' }, { id: 'user', name: 'User' }] }] }
   };
-  const show = async k => { await refreshCats(); crud($('#m'), views[k]); };
+  const show = async k => {
+    $('#m').innerHTML = '<p>Loading…</p>';
+    try { if (k === 'prods' && catsStale) await refreshCats(); } catch (e) { return $('#m').innerHTML = `<p style="color:#ff5470">${esc(e.message)}</p>`; }
+    crud($('#m'), views[k]);
+  };
   document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
   $('#out').onclick = async () => { await api('auth/logout', 'POST'); showLogin(); };
   show('cats');
