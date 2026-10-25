@@ -12,10 +12,12 @@ try {
     case 'auth':
       if ($sub==='login' && $m==='POST') {
         $i = input(); need($i, ['login','secret']); usleep(300000);
-        if (hash_equals(env('ADMIN_USER'), $i['login']) && hash_equals(env('ADMIN_PASS'), $i['secret'])) $a = ['id'=>0,'name'=>'Admin','role'=>'admin'];
+        $login = trim((string)$i['login']); $secret = (string)$i['secret'];
+        if (hash_equals((string)env('ADMIN_USER'), $login) && hash_equals((string)env('ADMIN_PASS'), $secret)) $a = ['id'=>0,'name'=>'Admin','role'=>'admin'];
         else {
-          $q = db()->prepare('SELECT id,name,role,pin_hash FROM users WHERE mobile=?'); $q->execute([$i['login']]); $u = $q->fetch();
-          if (!$u || !password_verify($i['secret'], $u['pin_hash'])) fail('Invalid credentials', 401);
+          // subadmin / user can log in with their username OR their 10-digit mobile number
+          $q = db()->prepare('SELECT id,name,role,pin_hash FROM users WHERE username=? OR mobile=? LIMIT 1'); $q->execute([$login, $login]); $u = $q->fetch();
+          if (!$u || !password_verify($secret, $u['pin_hash'])) fail('Invalid credentials', 401);
           $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
         }
         session_regenerate_id(true); $_SESSION['auth'] = $a; ok($a);
@@ -25,8 +27,13 @@ try {
       fail('Not found', 404);
 
     case 'users':
-      resource('users', ['admin'], 'id,name,mobile,email,gst,role,created_at', function ($in, $u) {
-        $d = clean($in, $u, ['name','mobile','email','gst','pin','role']);
+      require_role('admin'); // users data (mobile/email/GST) is admin-only, even for reading
+      resource('users', ['admin'], 'id,name,username,mobile,email,gst,role,created_at', function ($in, $u) {
+        $d = clean($in, $u, ['name','username','mobile','email','gst','pin','role']);
+        if (isset($d['username'])) {
+          if (!preg_match('/^[A-Za-z][A-Za-z0-9_.]{2,29}$/', $d['username'])) fail('Username must be 3-30 chars, start with a letter, only letters/numbers/_ .', 422);
+          if (strcasecmp($d['username'], (string)env('ADMIN_USER')) === 0) fail('This username is reserved', 422);
+        }
         if (isset($d['mobile']) && !preg_match('/^\d{10}$/', $d['mobile'])) fail('Mobile must be 10 digits', 422);
         if (isset($d['email']) && !filter_var($d['email'], FILTER_VALIDATE_EMAIL)) fail('Invalid email', 422);
         if (isset($d['gst']) && !preg_match('/^[0-9A-Za-z]{15}$/', $d['gst'])) fail('GST must be 15 characters', 422);
@@ -48,5 +55,5 @@ try {
     default: fail('Unknown resource', 404);
   }
 } catch (PDOException $e) {
-  fail($e->getCode()==='23000' ? 'Duplicate value or invalid category' : 'Database error: '.$e->getMessage(), 422);
+  fail($e->getCode()==='23000' ? ($res==='users' ? 'Username or mobile already exists' : 'Duplicate value or invalid category') : 'Database error: '.$e->getMessage(), 422);
 }

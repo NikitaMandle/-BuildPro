@@ -14,22 +14,22 @@ To send PUT/DELETE with multipart, POST with a `_method=PUT` field (the site's J
 
 ## 1. Auth
 ### POST `path=auth/login`
-Admin: `{"login":"admin","secret":"Admin@12345"}` (values from `.env`). Subadmin/User: `{"login":"<10-digit mobile>","secret":"<4-digit PIN>"}`.
+Admin: `{"login":"admin","secret":"Admin@12345"}` (values from `.env`). Subadmin/User: `{"login":"<username or 10-digit mobile>","secret":"<4-digit PIN>"}` (username is case-insensitive).
 Response: `{"success":true,"data":{"id":0,"name":"Admin","role":"admin"}}` — 401 on wrong credentials.
 ### GET `path=auth/me` — current logged-in user (401 if not logged in)
 ### POST `path=auth/logout` — ends session
 
 ## 2. Users (admin only)
-Fields: `name`, `mobile` (10 digits, unique), `email`, `gst` (15 chars), `pin` (4 digits, stored hashed), `role` (`subadmin` | `user`).
+Fields: `name`, `username` (3-30 chars, starts with a letter, letters/numbers/`_`/`.`, unique, used for login), `mobile` (10 digits, unique), `email`, `gst` (15 chars), `pin` (4 digits, stored hashed), `role` (`subadmin` | `user`).
 | Method | path | Description |
 |---|---|---|
-| GET | `users` | List all users (PIN never returned) |
+| GET | `users` | List all users (admin only, PIN never returned) |
 | GET | `users/{id}` | Get one user |
 | POST | `users` | Create — all fields required |
 | PUT | `users/{id}` | Update — send only fields to change (blank `pin` = unchanged) |
 | DELETE | `users/{id}` | Delete user |
 
-Example: `curl -b c.txt -X POST "…?path=users" -H "Content-Type: application/json" -d '{"name":"Ravi","mobile":"9876543210","email":"ravi@x.com","gst":"27ABCDE1234F1Z5","pin":"1234","role":"subadmin"}'`
+Example: `curl -b c.txt -X POST "…?path=users" -H "Content-Type: application/json" -d '{"name":"Ravi","username":"ravi_k","mobile":"9876543210","email":"ravi@x.com","gst":"27ABCDE1234F1Z5","pin":"1234","role":"subadmin"}'`
 
 ## 3. Categories (write: admin, subadmin)
 Fields: `name` (unique, required), `image` (file, optional JPG/PNG/WEBP ≤ 3MB).

@@ -1,7 +1,7 @@
 <?php
 // ---------- Reusable helpers ----------
 const TABLES = [
-  'users'      => ['name','mobile','email','gst','pin_hash','role'],
+  'users'      => ['name','username','mobile','email','gst','pin_hash','role'],
   'categories' => ['name','image'],
   'products'   => ['category_id','name','description','price','unit','image'],
 ];

@@ -1,25 +1,16 @@
 // ---------- Reusable utilities ----------
+const ROOT = new URL('../', document.currentScript.src).href;   // project root, independent of page URL
+const asset = p => ROOT + p;                                     // e.g. asset('uploads/x.jpg')
 const $ = (s, r = document) => r.querySelector(s);
 const esc = s => String(s ?? '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[m]));
 async function api(path, method = 'GET', data = null) {
   const [p, q] = path.split('?'); const o = { method, credentials: 'same-origin' };
   if (data instanceof FormData) { if (method !== 'POST') { data.append('_method', method); o.method = 'POST'; } o.body = data; }
   else if (data) { o.headers = { 'Content-Type': 'application/json' }; o.body = JSON.stringify(data); }
-  const j = await (await fetch(`api/index.php?path=${p}${q ? '&' + q : ''}`, o)).json();
+  const j = await (await fetch(`${ROOT}api/index.php?path=${p}${q ? '&' + q : ''}`, o)).json();
   if (!j.success) throw new Error(j.error); return j.data;
 }
 function toast(msg, err) { const t = document.createElement('div'); t.className = 'toast' + (err ? ' err' : ''); t.textContent = msg; document.body.append(t); setTimeout(() => t.remove(), 2800); }
-function tilt(el) {
-  el.classList.add('tilt');
-  el.onmousemove = e => { const r = el.getBoundingClientRect(), x = (e.clientX - r.left) / r.width, y = (e.clientY - r.top) / r.height;
-    el.style.setProperty('--ry', (x - .5) * 18 + 'deg'); el.style.setProperty('--rx', (.5 - y) * 18 + 'deg');
-    el.style.setProperty('--gx', x * 100 + '%'); el.style.setProperty('--gy', y * 100 + '%'); };
-  el.onmouseleave = () => { el.style.setProperty('--rx', '0deg'); el.style.setProperty('--ry', '0deg'); };
-}
-function animateIn(root = document) {
-  const io = new IntersectionObserver(es => es.forEach(e => e.isIntersecting && e.target.classList.add('in')), { threshold: .1 });
-  root.querySelectorAll('.reveal').forEach(el => io.observe(el)); root.querySelectorAll('[data-tilt]').forEach(tilt);
-}
 // Generic CRUD table + modal form. c = {title,res,cols,fields,edit,filter}
 function crud(root, c) {
   let list = [], fv = '';
@@ -29,7 +20,7 @@ function crud(root, c) {
       ${c.filter ? `<select id="f"><option value="">All</option>${c.filter.options().map(o => `<option value="${o.id}" ${o.id == fv ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       ${c.edit ? '<button class="btn" id="add">+ Add</button>' : ''}</div>
       <table><tr>${c.cols.map(x => `<th>${x.label}</th>`).join('')}${c.edit ? '<th></th>' : ''}</tr>
-      ${list.map(r => `<tr>${c.cols.map(x => `<td>${x.img ? (r[x.k] ? `<img src="${esc(r[x.k])}">` : '') : esc(x.map ? x.map(r[x.k]) : r[x.k])}</td>`).join('')}
+      ${list.map(r => `<tr>${c.cols.map(x => `<td>${x.img ? (r[x.k] ? `<img src="${esc(asset(r[x.k]))}">` : '') : esc(x.map ? x.map(r[x.k]) : r[x.k])}</td>`).join('')}
       ${c.edit ? `<td><button class="btn sm ghost" data-e="${r.id}">Edit</button> <button class="btn sm" data-d="${r.id}">Delete</button></td>` : ''}</tr>`).join('')}</table>`;
     if (c.filter) $('#f', root).onchange = e => { fv = e.target.value; load(); };
     if (c.edit) { $('#add', root).onclick = () => form();
