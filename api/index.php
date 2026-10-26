@@ -55,7 +55,7 @@ $dispatch = function () use ($res, $id, $sub, $m) {
         if (array_key_exists('description', $in)) $d['description'] = sanitize_html($in['description']);
         if (array_key_exists('price', $in)) $d['price'] = trim((string)$in['price']);
         if (!$u && !isset($d['price'])) fail('price is required', 422);
-        if (isset($d['price']) && mb_strlen($d['price']) > 100) fail('Price must be at most 100 characters', 422);
+        if (isset($d['price']) && preg_match_all('/./us', $d['price']) > 100) fail('Price must be at most 100 characters', 422);
         return $d;
       }, ['category_id'], $id, $m);
 
