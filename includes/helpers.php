@@ -78,9 +78,7 @@ function clean($in, $upd, $req, $opt=[]) {
   foreach (array_merge($req,$opt) as $k) if (isset($in[$k]) && trim((string)$in[$k])!=='') $o[$k] = trim((string)$in[$k]);
   return $o;
 }
-// ADMIN_OPEN: when on (default), anyone is treated as admin without login. Set ADMIN_OPEN=0 in .env / Render env to lock it again.
-function admin_open() { return env('ADMIN_OPEN', '1') !== '0'; }
-function me() { return $_SESSION['auth'] ?? (admin_open() ? ['id'=>0,'name'=>'Admin','role'=>'admin'] : null); }
+function me() { return $_SESSION['auth'] ?? null; }
 function require_role(...$roles) { $m = me(); if (!$m) fail('Login required', 401); if (!in_array($m['role'],$roles)) fail('Forbidden', 403); return $m; }
 function upload_image($field, $old=null) {
   if (empty($_FILES[$field]) || $_FILES[$field]['error']===UPLOAD_ERR_NO_FILE) return $old;

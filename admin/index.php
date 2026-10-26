@@ -2,8 +2,9 @@
 session_set_cookie_params(['httponly'=>true,'samesite'=>'Lax']);
 session_start();
 require __DIR__.'/../includes/helpers.php'; restore_session();
-// Not logged in -> open the dashboard anyway as a view-only guest (categories/products are public data).
-$me = me() ?? ['id'=>-1,'name'=>'Guest (view only)','role'=>'guest'];
+// Not logged in -> send to the login page.
+$me = me();
+if (!$me) { session_write_close(); header('Location: ../login.php', true, 302); exit; }
 session_write_close();
 ?>
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
@@ -38,7 +39,6 @@ const show = async k => {
   crud($('#m'), views[k]);
 };
 document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
-if (me.role === 'guest') $('#out').textContent = 'Login for full access';
-$('#out').onclick = async () => { if (me.role !== 'guest') await api('auth/logout', 'POST'); location.href = ROOT; };
+$('#out').onclick = async () => { await api('auth/logout', 'POST'); location.href = ROOT; };
 show('cats');
 </script></body></html>
