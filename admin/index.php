@@ -11,8 +11,8 @@ if (!$me):
 <title>BuildPro Login</title><link rel="stylesheet" href="../assets/style.css"></head><body>
 <?php include __DIR__ . '/../includes/scene.php'; ?>
 <form class="card" id="f"><h2>BuildPro Login</h2>
-<label>Username / Mobile number<input name="login" autocomplete="username" required></label>
-<label>Password / 4-digit PIN<input name="secret" type="password" autocomplete="current-password" required></label>
+<label>Username<input name="login" autocomplete="username" required></label>
+<label>Password<input name="secret" type="password" autocomplete="current-password" required></label>
 <button class="btn">Login</button></form>
 <script src="../assets/app.js"></script><script>
 $('#f').onsubmit = async e => { e.preventDefault();
