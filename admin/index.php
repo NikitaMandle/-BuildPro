@@ -2,11 +2,24 @@
 session_set_cookie_params(['httponly'=>true,'samesite'=>'Lax']);
 session_start();
 require __DIR__.'/../includes/helpers.php'; restore_session();
-// Not logged in -> send to the login page.
+// Not logged in -> show the login form right here on /admin (URL stays the same).
 $me = me();
-if (!$me) { session_write_close(); header('Location: ../login.php', true, 302); exit; }
 session_write_close();
+if (!$me):
 ?>
+<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>BuildPro Login</title><link rel="stylesheet" href="../assets/style.css"></head><body>
+<?php include __DIR__ . '/../includes/scene.php'; ?>
+<form class="card" id="f"><h2>BuildPro Login</h2>
+<label>Username / Mobile number<input name="login" autocomplete="username" required></label>
+<label>Password / 4-digit PIN<input name="secret" type="password" autocomplete="current-password" required></label>
+<button class="btn">Login</button></form>
+<script src="../assets/app.js"></script><script>
+$('#f').onsubmit = async e => { e.preventDefault();
+  try { await api('auth/login', 'POST', Object.fromEntries(new FormData(e.target))); location.reload(); }
+  catch (x) { toast(x.message, 1); } };
+</script></body></html>
+<?php exit; endif; ?>
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BuildPro Admin</title><link rel="stylesheet" href="../assets/style.css"></head><body>
 
@@ -39,6 +52,6 @@ const show = async k => {
   crud($('#m'), views[k]);
 };
 document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
-$('#out').onclick = async () => { await api('auth/logout', 'POST'); location.href = ROOT; };
+$('#out').onclick = async () => { await api('auth/logout', 'POST'); location.reload(); };
 show('cats');
 </script></body></html>

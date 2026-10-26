@@ -1,3 +1,4 @@
 <?php
-// Site root = login page. (If already logged in, login.php sends you straight to /admin)
-require __DIR__ . '/login.php';
+// Site root opens the admin panel (login form shows there if not logged in).
+header('Location: admin/', true, 302);
+exit;
