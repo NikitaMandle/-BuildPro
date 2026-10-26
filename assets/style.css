@@ -15,3 +15,4 @@ td img{width:46px;height:46px;object-fit:cover;border-radius:8px}
 .modal{position:fixed;inset:0;background:#000a;display:grid;place-items:center;z-index:20;overflow:auto}.modal form{margin:0;width:min(420px,92vw)}
 .row{display:flex;gap:10px}.toast{position:fixed;bottom:20px;right:20px;background:var(--acc);color:#111;padding:12px 18px;border-radius:10px;z-index:30}.toast.err{background:#ff5470;color:#fff}
 @media(max-width:700px){.dash{grid-template-columns:1fr}}
+.btn.ghost{border:2px solid transparent}.btn.ghost.active{border-color:var(--acc)}

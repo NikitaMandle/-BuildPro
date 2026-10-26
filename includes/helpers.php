@@ -147,7 +147,7 @@ function restore_session() {
     $d = json_decode(base64_decode($p), true);
     if (!is_array($d) || ($d['e'] ?? 0) < time()) return;
     $a = $d['a'];
-    if ($a['id'] > 0) { // subadmin/user: must still exist; take latest name/role
+    if ($a['id'] > 0) { // subgi/user: must still exist; take latest name/role
       $q = db()->prepare('SELECT id,name,role FROM users WHERE id=?'); $q->execute([$a['id']]); $u = $q->fetch();
       if (!$u) return; $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
     }

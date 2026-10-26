@@ -11,8 +11,8 @@ if (!$me):
 <title>BuildPro Login</title><link rel="stylesheet" href="../assets/style.css"></head><body>
 <?php include __DIR__ . '/../includes/scene.php'; ?>
 <form class="card" id="f"><h2>BuildPro Login</h2>
-<label>Username <input name="login" autocomplete="username" required></label>
-<label>Password <input name="secret" type="password" autocomplete="current-password" required></label>
+<label>Username / Mobile number<input name="login" autocomplete="username" required></label>
+<label>Password / 4-digit PIN<input name="secret" type="password" autocomplete="current-password" required></label>
 <button class="btn">Login</button></form>
 <script src="../assets/app.js"></script><script>
 $('#f').onsubmit = async e => { e.preventDefault();
@@ -31,7 +31,7 @@ const me = <?= json_encode($me, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 let cats = [], catsStale = true;
 const catOpts = () => cats; const refreshCats = async () => { cats = await api('categories'); catsStale = false; };
 
-$('#who').textContent = `${me.name} (${me.role})`;
+$('#who').textContent = me.name;
 const canEdit = ['admin', 'subadmin'].includes(me.role); $('#ub').hidden = me.role !== 'admin';
 const views = {
   cats: { title: 'Categories', res: 'categories', edit: canEdit, onChange: () => catsStale = true, cols: [{ k: 'image', label: 'Image', img: 1 }, { k: 'name', label: 'Name' }],
@@ -47,6 +47,7 @@ const views = {
       { k: 'role', label: 'Role', type: 'select', options: () => [{ id: 'subadmin', name: 'Subadmin' }, { id: 'user', name: 'User' }] }] }
 };
 const show = async k => {
+  document.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('active', x.dataset.t === k));
   $('#m').innerHTML = '<p>Loading…</p>';
   try { if (k === 'prods' && catsStale) await refreshCats(); } catch (e) { return $('#m').innerHTML = `<p style="color:#ff5470">${esc(e.message)}</p>`; }
   crud($('#m'), views[k]);
