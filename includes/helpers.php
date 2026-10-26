@@ -3,7 +3,7 @@
 const TABLES = [
   'users'      => ['name','username','mobile','email','gst','pin_hash','role'],
   'categories' => ['name','image'],
-  'products'   => ['category_id','name','description','price','unit','image'],
+  'products'   => ['category_id','name','description','price'],
 ];
 
 function env($k, $d = null) {
@@ -147,10 +147,52 @@ function restore_session() {
     $d = json_decode(base64_decode($p), true);
     if (!is_array($d) || ($d['e'] ?? 0) < time()) return;
     $a = $d['a'];
-    if ($a['id'] > 0) { // subgi/user: must still exist; take latest name/role
+    if ($a['id'] > 0) { // subadmin/user: must still exist; take latest name/role
       $q = db()->prepare('SELECT id,name,role FROM users WHERE id=?'); $q->execute([$a['id']]); $u = $q->fetch();
       if (!$u) return; $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
     }
     $_SESSION['auth'] = $a;
   } catch (Throwable $e) { /* ignore, user just logs in again */ }
+}
+
+// ---------- Rich-text (HTML editor) support ----------
+// Keeps only a small safe set of tags; strips every attribute (except a safe link href), scripts, styles, iframes etc.
+function sanitize_nodes($nodes) {
+  $keep = ['p','b','strong','i','em','u','s','ul','ol','li','h2','h3','h4','blockquote'];
+  $o = '';
+  foreach ($nodes as $n) {
+    if ($n->nodeType === XML_TEXT_NODE) { $o .= htmlspecialchars($n->nodeValue, ENT_QUOTES | ENT_SUBSTITUTE, 'UTF-8'); continue; }
+    if ($n->nodeType !== XML_ELEMENT_NODE) continue;
+    $t = strtolower($n->nodeName);
+    if (in_array($t, ['script','style','iframe','object','embed','noscript','template','svg','math'])) continue;
+    $inner = sanitize_nodes($n->childNodes);
+    if ($t === 'br') $o .= '<br>';
+    elseif ($t === 'div') $o .= "<p>$inner</p>";
+    elseif ($t === 'a') {
+      $h = trim($n->getAttribute('href'));
+      $o .= preg_match('~^(https?://|mailto:|tel:)~i', $h)
+        ? '<a href="'.htmlspecialchars($h, ENT_QUOTES, 'UTF-8').'" target="_blank" rel="noopener noreferrer">'.$inner.'</a>' : $inner;
+    }
+    elseif (in_array($t, $keep)) $o .= "<$t>$inner</$t>";
+    else $o .= $inner;
+  }
+  return $o;
+}
+function sanitize_html($html) {
+  $html = trim((string)$html);
+  if ($html === '') return '';
+  $doc = new DOMDocument(); libxml_use_internal_errors(true);
+  $doc->loadHTML('<?xml encoding="utf-8"?><body>'.$html.'</body>'); libxml_clear_errors();
+  $body = $doc->getElementsByTagName('body')->item(0);
+  $out = $body ? trim(sanitize_nodes($body->childNodes)) : '';
+  // nothing but empty tags / spaces -> treat as empty
+  return preg_replace('/[\s\x{00A0}]+/u', '', html_entity_decode(strip_tags($out), ENT_QUOTES, 'UTF-8')) === '' ? '' : $out;
+}
+
+// One-time, automatic upgrade of an older products table: price becomes free text (e.g. "₹85 / Kg").
+function ensure_products_schema() {
+  static $done = false; if ($done) return; $done = true;
+  $q = db()->query("SELECT DATA_TYPE AS t FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'price'");
+  $t = strtolower((string)$q->fetchColumn());
+  if ($t !== '' && !in_array($t, ['varchar','text'])) db()->exec("ALTER TABLE products MODIFY price VARCHAR(100) NOT NULL DEFAULT ''");
 }

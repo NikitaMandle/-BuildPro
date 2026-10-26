@@ -48,9 +48,14 @@ $dispatch = function () use ($res, $id, $sub, $m) {
       resource('categories', ['admin','subadmin'], '*', fn($in,$u) => clean($in,$u,['name']), [], $id, $m);
 
     case 'products':
-      resource('products', ['admin','subadmin'], '*', function ($in, $u) {
-        $d = clean($in, $u, ['category_id','name'], ['description','price','unit']);
-        if (isset($d['price']) && !is_numeric($d['price'])) fail('Price must be a number', 422);
+      if ($m !== 'GET') ensure_products_schema();
+      resource('products', ['admin','subadmin'], 'id,category_id,name,description,price,created_at', function ($in, $u) {
+        $d = clean($in, $u, ['category_id','name']);
+        // description (rich HTML, sanitized) and price (free text) may be sent blank to clear them
+        if (array_key_exists('description', $in)) $d['description'] = sanitize_html($in['description']);
+        if (array_key_exists('price', $in)) $d['price'] = trim((string)$in['price']);
+        if (!$u && !isset($d['price'])) fail('price is required', 422);
+        if (isset($d['price']) && mb_strlen($d['price']) > 100) fail('Price must be at most 100 characters', 422);
         return $d;
       }, ['category_id'], $id, $m);
 

@@ -42,15 +42,15 @@ Fields: `name` (unique, required), `image` (file, optional JPG/PNG/WEBP ≤ 3MB)
 | DELETE | `categories/{id}` | Delete category + its products + image |
 
 ## 4. Products (write: admin, subadmin)
-Fields: `category_id` (required), `name` (required), `description`, `price`, `unit` (piece/kg/meter), `image`.
+Fields: `category_id` (required), `name` (the product **title**, required), `description` (optional **HTML** from the admin editor — already sanitized; allowed tags: `p br b strong i em u s ul ol li h2 h3 h4 blockquote a`), `price` (required, **free text**, e.g. `"₹85 / Kg"`, max 100 chars). No image/unit.
 | Method | path | Description |
 |---|---|---|
 | GET | `products` | List all (public) |
 | GET | `products&category_id=2` | **Category-wise list** (public) |
 | GET | `products/{id}` | Get one (public) |
-| POST | `products` | Create (multipart) |
+| POST | `products` | Create (JSON or form fields) |
 | PUT | `products/{id}` | Update |
-| DELETE | `products/{id}` | Delete product + image |
+| DELETE | `products/{id}` | Delete product |
 
 ## Errors
 `401` login required · `403` forbidden · `404` not found · `405` method not allowed · `422` validation / duplicate.
