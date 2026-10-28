@@ -2,3 +2,7 @@
   Require all denied
 </FilesMatch>
 Options -Indexes
+
+# Pass the Authorization header through to PHP (needed for Bearer tokens on Apache/CGI)
+RewriteEngine On
+RewriteRule .* - [E=HTTP_AUTHORIZATION:%{HTTP:Authorization}]

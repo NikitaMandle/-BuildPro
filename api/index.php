@@ -22,7 +22,7 @@ $dispatch = function () use ($res, $id, $sub, $m) {
           if (!$u || !password_verify($secret, $u['pin_hash'])) fail('Invalid credentials', 401);
           $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
         }
-        session_regenerate_id(true); $_SESSION['auth'] = $a; remember_set($a); ok($a);
+        session_regenerate_id(true); $_SESSION['auth'] = $a; remember_set($a); ok($a + ['token'=>token_make($a)]);
       }
       if ($sub==='logout') { remember_clear(); session_destroy(); ok(); }
       if ($sub==='me') ok(me() ?? fail('Not logged in', 401));

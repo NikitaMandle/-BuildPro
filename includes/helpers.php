@@ -78,7 +78,36 @@ function clean($in, $upd, $req, $opt=[]) {
   foreach (array_merge($req,$opt) as $k) if (isset($in[$k]) && trim((string)$in[$k])!=='') $o[$k] = trim((string)$in[$k]);
   return $o;
 }
-function me() { return $_SESSION['auth'] ?? null; }
+function me() { return $_SESSION['auth'] ?? token_auth(); }
+
+// ---------- Bearer token auth (for mobile apps / API clients) ----------
+// Login returns a signed token (30 days). Send it as:  Authorization: Bearer <token>
+function b64u($s) { return rtrim(strtr(base64_encode($s), '+/', '-_'), '='); }
+function b64u_d($s) { return base64_decode(strtr($s, '-_', '+/')); }
+function token_make($a) {
+  $p = b64u(json_encode(['a'=>$a,'e'=>time()+30*86400]));
+  return $p.'.'.hash_hmac('sha256', $p, remember_key());
+}
+function bearer_token() {
+  $h = $_SERVER['HTTP_AUTHORIZATION'] ?? $_SERVER['REDIRECT_HTTP_AUTHORIZATION'] ?? '';
+  if ($h === '' && function_exists('getallheaders')) foreach (getallheaders() as $k=>$v) if (strcasecmp($k,'Authorization')===0) $h = $v;
+  if (preg_match('/^Bearer\s+(\S+)$/i', trim($h), $m)) return $m[1];
+  return $_SERVER['HTTP_X_AUTH_TOKEN'] ?? '';
+}
+function token_auth() {
+  static $r = false; if ($r !== false) return $r; $r = null;
+  $t = bearer_token(); if ($t === '') return $r;
+  [$p,$sig] = array_pad(explode('.', $t, 2), 2, '');
+  if (!hash_equals(hash_hmac('sha256', $p, remember_key()), $sig)) return $r;
+  $d = json_decode(b64u_d($p), true);
+  if (!is_array($d) || ($d['e'] ?? 0) < time() || !is_array($d['a'] ?? null)) return $r;
+  $a = $d['a'];
+  if ((int)($a['id'] ?? 0) > 0) { // subadmin/user must still exist; use latest name/role
+    $q = db()->prepare('SELECT id,name,role FROM users WHERE id=?'); $q->execute([(int)$a['id']]); $u = $q->fetch();
+    if (!$u) return $r; $a = ['id'=>(int)$u['id'],'name'=>$u['name'],'role'=>$u['role']];
+  }
+  return $r = $a;
+}
 function require_role(...$roles) { $m = me(); if (!$m) fail('Login required', 401); if (!in_array($m['role'],$roles)) fail('Forbidden', 403); return $m; }
 function upload_image($field, $old=null) {
   if (empty($_FILES[$field]) || $_FILES[$field]['error']===UPLOAD_ERR_NO_FILE) return $old;
@@ -93,8 +122,6 @@ function upload_image($field, $old=null) {
 function delete_file($p) { if ($p && is_file($f = __DIR__.'/../'.$p)) @unlink($f); }
 
 // ---------- Generic CRUD (any table in TABLES) ----------
-// DB is utf8 (3-byte), so 4-byte characters (emoji) are removed before saving to avoid DB errors.
-function utf8_safe($v) { return is_string($v) ? (preg_replace('/[\x{10000}-\x{10FFFF}]/u', '', $v) ?? $v) : $v; }
 function crud_all($t, $sel='*', $where=[]) {
   $where = array_intersect_key($where, array_flip(TABLES[$t])); $s = "SELECT $sel FROM $t";
   if ($where) $s .= ' WHERE '.implode(' AND ', array_map(fn($k)=>"$k=?", array_keys($where)));
@@ -102,12 +129,12 @@ function crud_all($t, $sel='*', $where=[]) {
 }
 function crud_find($t, $id, $sel='*') { $q = db()->prepare("SELECT $sel FROM $t WHERE id=?"); $q->execute([$id]); return $q->fetch() ?: null; }
 function crud_insert($t, $d) {
-  $d = array_map('utf8_safe', array_intersect_key($d, array_flip(TABLES[$t])));
+  $d = array_intersect_key($d, array_flip(TABLES[$t]));
   db()->prepare("INSERT INTO $t(".implode(',',array_keys($d)).') VALUES('.implode(',',array_fill(0,count($d),'?')).')')->execute(array_values($d));
   return (int)db()->lastInsertId();
 }
 function crud_update($t, $id, $d) {
-  $d = array_map('utf8_safe', array_intersect_key($d, array_flip(TABLES[$t]))); if (!$d) return;
+  $d = array_intersect_key($d, array_flip(TABLES[$t])); if (!$d) return;
   db()->prepare("UPDATE $t SET ".implode(',',array_map(fn($k)=>"$k=?",array_keys($d)))." WHERE id=?")->execute([...array_values($d), $id]);
 }
 function crud_delete($t, $id) { db()->prepare("DELETE FROM $t WHERE id=?")->execute([$id]); }
@@ -115,6 +142,7 @@ function crud_delete($t, $id) { db()->prepare("DELETE FROM $t WHERE id=?")->exec
 // One handler for every resource: list / get / create / update / delete
 function resource($t, $write, $sel, $validate, $filters, $id, $m) {
   if ($m==='GET') {
+    require_role('admin','subadmin','user'); // every endpoint needs login (session cookie or Bearer token)
     if ($id) ok(crud_find($t,$id,$sel) ?? fail('Not found',404));
     $w = []; foreach ($filters as $f) if (!empty($_GET[$f])) $w[$f] = $_GET[$f];
     ok(crud_all($t,$sel,$w));
