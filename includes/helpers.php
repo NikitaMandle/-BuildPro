@@ -54,7 +54,7 @@ function db() {
         throw new RuntimeException('Database environment variables are missing.');
     }
 
-    $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8mb4";
+    $dsn = "mysql:host={$host};port={$port};dbname={$name};charset=utf8";
 
     $options = [
         PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION,
@@ -93,6 +93,8 @@ function upload_image($field, $old=null) {
 function delete_file($p) { if ($p && is_file($f = __DIR__.'/../'.$p)) @unlink($f); }
 
 // ---------- Generic CRUD (any table in TABLES) ----------
+// DB is utf8 (3-byte), so 4-byte characters (emoji) are removed before saving to avoid DB errors.
+function utf8_safe($v) { return is_string($v) ? (preg_replace('/[\x{10000}-\x{10FFFF}]/u', '', $v) ?? $v) : $v; }
 function crud_all($t, $sel='*', $where=[]) {
   $where = array_intersect_key($where, array_flip(TABLES[$t])); $s = "SELECT $sel FROM $t";
   if ($where) $s .= ' WHERE '.implode(' AND ', array_map(fn($k)=>"$k=?", array_keys($where)));
@@ -100,12 +102,12 @@ function crud_all($t, $sel='*', $where=[]) {
 }
 function crud_find($t, $id, $sel='*') { $q = db()->prepare("SELECT $sel FROM $t WHERE id=?"); $q->execute([$id]); return $q->fetch() ?: null; }
 function crud_insert($t, $d) {
-  $d = array_intersect_key($d, array_flip(TABLES[$t]));
+  $d = array_map('utf8_safe', array_intersect_key($d, array_flip(TABLES[$t])));
   db()->prepare("INSERT INTO $t(".implode(',',array_keys($d)).') VALUES('.implode(',',array_fill(0,count($d),'?')).')')->execute(array_values($d));
   return (int)db()->lastInsertId();
 }
 function crud_update($t, $id, $d) {
-  $d = array_intersect_key($d, array_flip(TABLES[$t])); if (!$d) return;
+  $d = array_map('utf8_safe', array_intersect_key($d, array_flip(TABLES[$t]))); if (!$d) return;
   db()->prepare("UPDATE $t SET ".implode(',',array_map(fn($k)=>"$k=?",array_keys($d)))." WHERE id=?")->execute([...array_values($d), $id]);
 }
 function crud_delete($t, $id) { db()->prepare("DELETE FROM $t WHERE id=?")->execute([$id]); }
