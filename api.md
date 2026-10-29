@@ -2,7 +2,7 @@
 
 **Base URL:** `http://localhost/construction-site/api/index.php?path=<resource>[/<id>]`
 All responses are JSON: `{"success":true,"data":...}` or `{"success":false,"error":"message"}`.
-**Every endpoint except `auth/login` requires login.** Mobile apps: call `auth/login`, then send `Authorization: Bearer <token>` on every request (token valid 30 days). The web admin panel uses the session cookie instead. For file uploads use `multipart/form-data`.
+**Every endpoint except `auth/login` and reading `pages` requires login.** Mobile apps: call `auth/login`, then send `Authorization: Bearer <token>` on every request (token valid 30 days). The web admin panel uses the session cookie instead. For file uploads use `multipart/form-data`.
 To send PUT/DELETE with multipart, POST with a `_method=PUT` field (the site's JS does this automatically).
 
 **Roles:** `admin` (from `.env`), `subadmin`, `user`.
@@ -10,6 +10,8 @@ To send PUT/DELETE with multipart, POST with a `_method=PUT` field (the site's J
 |---|---|---|---|---|
 | View categories/products | ✅ | ✅ | ✅ | ❌ (login required) |
 | Add/Edit/Delete categories & products | ✅ | ✅ | ❌ | ❌ |
+| View About Us / Contact Us pages | ✅ | ✅ | ✅ | ✅ |
+| Edit About Us / Contact Us pages | ✅ | ✅ | ❌ | ❌ |
 | Manage users (create subadmin/user) | ✅ | ❌ | ❌ | ❌ |
 
 ## 1. Auth
@@ -42,7 +44,7 @@ Fields: `name` (unique, required), `image` (file, optional JPG/PNG/WEBP ≤ 3MB)
 | DELETE | `categories/{id}` | Delete category + its products + image |
 
 ## 4. Products (write: admin, subadmin)
-Fields: `category_id` (required), `name` (the product **title**, required), `description` (optional **HTML** from the admin editor — already sanitized; allowed tags: `p br b strong i em u s ul ol li h2 h3 h4 blockquote a`), `price` (required, **free text**, e.g. `"₹85 / Kg"`, max 100 chars). No image/unit.
+Fields: `category_id` (required), `name` (the product **title**, required), `description` (optional **HTML** from the admin editor — already sanitized; allowed tags: `p br b strong i em u s ul ol li h2 h3 h4 blockquote a`), `min_qty` (optional, **free text** — number and/or words, e.g. `"10 TON"`, `"Booking"`, `"50 Kg"`, max 100 chars; send blank to clear), `price` (required, **free text**, e.g. `"₹85 / Kg"`, max 100 chars). No image/unit. Responses include `min_qty`.
 | Method | path | Description |
 |---|---|---|
 | GET | `products` | List all (login required) |
@@ -51,6 +53,14 @@ Fields: `category_id` (required), `name` (the product **title**, required), `des
 | POST | `products` | Create (JSON or form fields) |
 | PUT | `products/{id}` | Update |
 | DELETE | `products/{id}` | Delete product |
+
+## 5. Pages (About Us / Contact Us)
+Content is **HTML** from the admin editor (sanitized, same allowed tags as product description). Slugs: `about`, `contact`.
+| Method | path | Description |
+|---|---|---|
+| GET | `pages` | Both pages: `[{slug, content, updated_at}, ...]` (**public**, no login needed) |
+| GET | `pages/about` · `pages/contact` | One page (**public**); `content` is `""` until it is first saved |
+| PUT | `pages/{slug}` | Save — field `content` (multipart with `_method=PUT`, or JSON). admin, subadmin only |
 
 ## Errors
 `401` login required · `403` forbidden · `404` not found · `405` method not allowed · `422` validation / duplicate.

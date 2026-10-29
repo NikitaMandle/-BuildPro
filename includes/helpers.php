@@ -3,7 +3,7 @@
 const TABLES = [
   'users'      => ['name','username','mobile','email','gst','pin_hash','role'],
   'categories' => ['name','image'],
-  'products'   => ['category_id','name','description','price'],
+  'products'   => ['category_id','name','description','min_qty','price'],
 ];
 
 function env($k, $d = null) {
@@ -219,10 +219,31 @@ function sanitize_html($html) {
   return preg_replace('/[\s\x{00A0}]+/u', '', html_entity_decode(strip_tags($out), ENT_QUOTES, 'UTF-8')) === '' ? '' : $out;
 }
 
-// One-time, automatic upgrade of an older products table: price becomes free text (e.g. "₹85 / Kg").
+// One-time, automatic upgrade of an older products table:
+//  - price becomes free text (e.g. "Rs 85 / Kg")
+//  - min_qty column (free text, e.g. "10 TON", "Booking", "50 Kg") is added
 function ensure_products_schema() {
   static $done = false; if ($done) return; $done = true;
-  $q = db()->query("SELECT DATA_TYPE AS t FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'price'");
-  $t = strtolower((string)$q->fetchColumn());
-  if ($t !== '' && !in_array($t, ['varchar','text'])) db()->exec("ALTER TABLE products MODIFY price VARCHAR(100) NOT NULL DEFAULT ''");
+  $q = db()->query("SELECT COLUMN_NAME AS c, DATA_TYPE AS t FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products'");
+  $cols = []; foreach ($q->fetchAll() as $r) $cols[strtolower($r['c'])] = strtolower($r['t']);
+  if (isset($cols['price']) && !in_array($cols['price'], ['varchar','text'])) db()->exec("ALTER TABLE products MODIFY price VARCHAR(100) NOT NULL DEFAULT ''");
+  if (!isset($cols['min_qty'])) db()->exec("ALTER TABLE products ADD COLUMN min_qty VARCHAR(100) NOT NULL DEFAULT '' AFTER description");
+}
+
+// Editable site pages (About Us / Contact Us): one row per slug, content is sanitized HTML.
+const PAGE_SLUGS = ['about','contact'];
+function ensure_pages_table() {
+  static $done = false; if ($done) return; $done = true;
+  db()->exec("CREATE TABLE IF NOT EXISTS pages (
+    slug VARCHAR(30) NOT NULL PRIMARY KEY,
+    content MEDIUMTEXT NULL,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci");
+}
+function page_get($slug) {
+  $q = db()->prepare('SELECT slug,content,updated_at FROM pages WHERE slug=?'); $q->execute([$slug]);
+  return $q->fetch() ?: ['slug'=>$slug, 'content'=>'', 'updated_at'=>null];
+}
+function page_save($slug, $html) {
+  db()->prepare('INSERT INTO pages(slug,content) VALUES(?,?) ON DUPLICATE KEY UPDATE content=VALUES(content)')->execute([$slug, $html]);
 }

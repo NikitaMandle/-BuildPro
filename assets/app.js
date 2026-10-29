@@ -20,10 +20,10 @@ function plainText(h, max) {   // HTML -> short plain text for table previews (D
 function htmlField(f, row) {
   const v = row[f.k] || '', init = /<[a-z][\s\S]*>/i.test(v) ? v : esc(v).replace(/\n/g, '<br>');
   const b = (cmd, label, title, val = '') => `<button type="button" data-cmd="${cmd}" data-val="${val}" title="${title}">${label}</button>`;
-  return `<div class="field"><span>${f.label}</span><div class="ed"><div class="ed-bar">
+  return `<div class="field"><span>${f.label}</span><div class="ed${f.tall ? ' tall' : ''}"><div class="ed-bar">
     ${b('bold', '<b>B</b>', 'Bold')}${b('italic', '<i>I</i>', 'Italic')}${b('underline', '<u>U</u>', 'Underline')}${b('formatBlock', 'H', 'Heading', 'h3')}
     ${b('insertUnorderedList', '• List', 'Bullet list')}${b('insertOrderedList', '1. List', 'Numbered list')}${b('createLink', 'Link', 'Add link')}
-    ${b('removeFormat', 'Clear', 'Clear formatting')}${b('specs', '+ Specs', 'Insert Edge / Width / Finish / Payment Condition lines')}</div>
+    ${b('removeFormat', 'Clear', 'Clear formatting')}${f.noSpecs ? '' : b('specs', '+ Specs', 'Insert Edge / Width / Finish / Payment Condition lines')}</div>
     <div class="ed-body" contenteditable="true" data-ph="Write description…">${init}</div><input type="hidden" name="${f.k}"></div></div>`;
 }
 function initEditor(ed) {
@@ -40,6 +40,19 @@ function initEditor(ed) {
 }
 function syncEditor(ed) {      // copy the editor's HTML into its hidden input before the form is sent
   const b = $('.ed-body', ed); $('input', ed).value = (b.textContent.trim() || b.querySelector('li')) ? b.innerHTML : '';
+}
+// Single-page HTML editor (About Us / Contact Us). Content is stored as sanitized HTML via api 'pages/<slug>'.
+async function pageEditor(root, slug, title, canEdit) {
+  root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><p>Loading…</p>`;
+  let row;
+  try { row = await api(`pages/${slug}`); }
+  catch (e) { root.innerHTML = `<h2>${esc(title)}</h2><p style="color:#ff5470">${esc(e.message)}</p>`; return; }
+  if (!canEdit) { root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><div class="ed-body page-view">${row.content || '<p>Nothing added yet.</p>'}</div>`; return; }
+  root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><form class="page-form">${htmlField({ k: 'content', label: 'Content', noSpecs: 1, tall: 1 }, row)}<div class="row"><button class="btn">Save</button></div></form>`;
+  initEditor($('.ed', root));
+  $('form', root).onsubmit = async e => { e.preventDefault(); syncEditor($('.ed', root));
+    try { await api(`pages/${slug}`, 'PUT', new FormData(e.target)); toast('Saved'); }
+    catch (err) { toast(err.message, 1); } };
 }
 // Generic CRUD table + modal form. c = {title,res,cols,fields,edit,filter}
 function crud(root, c) {

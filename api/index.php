@@ -47,13 +47,28 @@ $dispatch = function () use ($res, $id, $sub, $m) {
     case 'categories':
       resource('categories', ['admin','subadmin'], '*', fn($in,$u) => clean($in,$u,['name']), [], $id, $m);
 
+    case 'pages':
+      // About Us / Contact Us. Read is public (mobile app shows them before login); edit = admin + subadmin.
+      ensure_pages_table();
+      if ($sub !== '' && !in_array($sub, PAGE_SLUGS, true)) fail('Not found', 404);
+      if ($m === 'GET') ok($sub === '' ? array_map('page_get', PAGE_SLUGS) : page_get($sub));
+      if (!in_array($m, ['PUT','POST'], true)) fail('Method not allowed', 405);
+      require_role('admin','subadmin');
+      if ($sub === '') fail('Page slug required (about or contact)', 422);
+      $in = input();
+      page_save($sub, sanitize_html($in['content'] ?? ''));
+      ok(page_get($sub));
+
     case 'products':
       if ($m !== 'GET') ensure_products_schema();
-      resource('products', ['admin','subadmin'], 'id,category_id,name,description,price,created_at', function ($in, $u) {
+      resource('products', ['admin','subadmin'], 'id,category_id,name,description,min_qty,price,created_at', function ($in, $u) {
         $d = clean($in, $u, ['category_id','name']);
         // description (rich HTML, sanitized) and price (free text) may be sent blank to clear them
         if (array_key_exists('description', $in)) $d['description'] = sanitize_html($in['description']);
         if (array_key_exists('price', $in)) $d['price'] = trim((string)$in['price']);
+        // minimum quantity: free text (number and/or words, e.g. "10 TON", "Booking"); optional, blank clears it
+        if (array_key_exists('min_qty', $in)) $d['min_qty'] = trim((string)$in['min_qty']);
+        if (isset($d['min_qty']) && preg_match_all('/./us', $d['min_qty']) > 100) fail('Min. quantity must be at most 100 characters', 422);
         if (!$u && !isset($d['price'])) fail('price is required', 422);
         if (isset($d['price']) && preg_match_all('/./us', $d['price']) > 100) fail('Price must be at most 100 characters', 422);
         return $d;
@@ -69,6 +84,10 @@ try {
     // Older database without users.username: add it once, then retry the same request
     if ($e->getCode()==='42S22' && stripos($e->getMessage(), 'username') !== false) {
       db()->exec('ALTER TABLE users ADD COLUMN username VARCHAR(30) NULL UNIQUE AFTER name');
+      $dispatch();
+    } elseif ($e->getCode()==='42S22' && stripos($e->getMessage(), 'min_qty') !== false) {
+      // Older database without products.min_qty: add it once, then retry the same request
+      ensure_products_schema();
       $dispatch();
     } else throw $e;
   }
