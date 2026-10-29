@@ -22,8 +22,8 @@ $('#f').onsubmit = async e => { e.preventDefault();
 <!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>BuildPro Admin</title><link rel="stylesheet" href="../assets/style.css"></head><body>
 
-<div class="dash" id="dash"><aside><b id="who"></b><button class="btn ghost" data-t="cats">Categories</button><button class="btn ghost" data-t="prods">Products</button><button class="btn ghost" data-t="about">About Us</button><button class="btn ghost" data-t="contact">Contact Us</button>
-<button class="btn ghost" data-t="users" id="ub" hidden>Users</button><button class="btn" id="out">Logout</button></aside><main id="m"></main></div>
+<div class="dash" id="dash"><aside><div class="brand">BuildPro</div><span id="who"></span><button class="btn ghost" data-t="cats">Categories</button><button class="btn ghost" data-t="prods">Products</button><button class="btn ghost" data-t="about">About Us</button><button class="btn ghost" data-t="contact">Contact Us</button>
+<button class="btn ghost" data-t="users" id="ub" hidden>Users</button><button class="btn ghost" id="out">Logout</button></aside><main id="m"></main></div>
 
 <script src="../assets/app.js"></script><script>
 const me = <?= json_encode($me, JSON_HEX_TAG | JSON_HEX_AMP) ?>;

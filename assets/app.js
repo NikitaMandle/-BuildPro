@@ -24,7 +24,7 @@ function htmlField(f, row) {
     ${b('bold', '<b>B</b>', 'Bold')}${b('italic', '<i>I</i>', 'Italic')}${b('underline', '<u>U</u>', 'Underline')}${b('formatBlock', 'H', 'Heading', 'h3')}
     ${b('insertUnorderedList', '• List', 'Bullet list')}${b('insertOrderedList', '1. List', 'Numbered list')}${b('createLink', 'Link', 'Add link')}
     ${b('removeFormat', 'Clear', 'Clear formatting')}${f.noSpecs ? '' : b('specs', '+ Specs', 'Insert Edge / Width / Finish / Payment Condition lines')}</div>
-    <div class="ed-body" contenteditable="true" data-ph="Write description…">${init}</div><input type="hidden" name="${f.k}"></div></div>`;
+    <div class="ed-body" contenteditable="true" data-ph="${f.ph || 'Write description…'}">${init}</div><input type="hidden" name="${f.k}"></div></div>`;
 }
 function initEditor(ed) {
   const body = $('.ed-body', ed); document.execCommand('defaultParagraphSeparator', false, 'p');
@@ -48,7 +48,7 @@ async function pageEditor(root, slug, title, canEdit) {
   try { row = await api(`pages/${slug}`); }
   catch (e) { root.innerHTML = `<h2>${esc(title)}</h2><p style="color:#ff5470">${esc(e.message)}</p>`; return; }
   if (!canEdit) { root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><div class="ed-body page-view">${row.content || '<p>Nothing added yet.</p>'}</div>`; return; }
-  root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><form class="page-form">${htmlField({ k: 'content', label: 'Content', noSpecs: 1, tall: 1 }, row)}<div class="row"><button class="btn">Save</button></div></form>`;
+  root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><form class="page-form">${htmlField({ k: 'content', label: 'Content', ph: 'Write content…', noSpecs: 1, tall: 1 }, row)}<div class="row"><button class="btn">Save</button></div></form>`;
   initEditor($('.ed', root));
   $('form', root).onsubmit = async e => { e.preventDefault(); syncEditor($('.ed', root));
     try { await api(`pages/${slug}`, 'PUT', new FormData(e.target)); toast('Saved'); }
