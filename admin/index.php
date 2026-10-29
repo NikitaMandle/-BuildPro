@@ -44,7 +44,7 @@ const views = {
     cols: [{ k: 'name', label: 'Title' }, { k: 'category_id', label: 'Category', pill: 1, map: v => cats.find(c => c.id == v)?.name }, { k: 'description', label: 'Description', plain: 70 }, { k: 'min_qty', label: 'Min. Qty' }, { k: 'price', label: 'Price', cls: 'price' }],
     fields: [{ k: 'name', label: 'Title' }, { k: 'category_id', label: 'Category', type: 'select', options: catOpts },
       { k: 'description', label: 'Description', type: 'html', req: false },
-      { k: 'min_qty', label: 'Min. Quantity (select from list or type your own)', type: 'combo', options: qtyOpts, req: false, attr: 'maxlength="100"' }, { k: 'price', label: 'Price (e.g. ₹85 / Kg)' }] },
+      { k: 'min_qty', label: 'Min. Quantity', type: 'combo', options: qtyOpts, req: false, attr: 'maxlength="100"' }, { k: 'price', label: 'Price (e.g. ₹85 / Kg)' }] },
   about: { page: 'about', title: 'About Us' },
   contact: { page: 'contact', title: 'Contact Us' },
   users: { title: 'Users', one: 'User', res: 'users', edit: true, cols: [{ k: 'name', label: 'Name' }, { k: 'username', label: 'Username' }, { k: 'mobile', label: 'Mobile' }, { k: 'email', label: 'Email' }, { k: 'gst', label: 'GST' }, { k: 'role', label: 'Role', pill: 1 }],
