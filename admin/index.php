@@ -28,6 +28,10 @@ $('#f').onsubmit = async e => { e.preventDefault();
 <script src="../assets/app.js"></script><script>
 const me = <?= json_encode($me, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
 let cats = [], catsStale = true;
+// Min. Quantity suggestions: a few defaults + every value already used on a product (anything else can still be typed)
+const qtySeen = new Set(), QTY_DEFAULT = ['Booking', 'Booking Price', '1 TON', '5 TON', '10 TON', '9 m.t.', '50 Kg', '100 Kg'];
+const qtyOpts = () => [...new Set([...QTY_DEFAULT, ...qtySeen])];
+const rememberQty = l => l.forEach(r => r.min_qty && qtySeen.add(r.min_qty));
 const catOpts = () => cats; const refreshCats = async () => { cats = await api('categories'); catsStale = false; };
 
 $('#who').textContent = me.name;
@@ -36,11 +40,11 @@ const views = {
   dash: { dash: 1 },
   cats: { title: 'Categories', res: 'categories', edit: canEdit, onChange: () => catsStale = true, cols: [{ k: 'image', label: 'Image', img: 1 }, { k: 'name', label: 'Name' }],
     fields: [{ k: 'name', label: 'Name' }, { k: 'image', label: 'Image', type: 'file', req: false }] },
-  prods: { title: 'Products', res: 'products', edit: canEdit, filter: { k: 'category_id', options: catOpts },
+  prods: { title: 'Products', res: 'products', edit: canEdit, onLoad: rememberQty, filter: { k: 'category_id', options: catOpts },
     cols: [{ k: 'name', label: 'Title' }, { k: 'category_id', label: 'Category', pill: 1, map: v => cats.find(c => c.id == v)?.name }, { k: 'description', label: 'Description', plain: 70 }, { k: 'min_qty', label: 'Min. Qty' }, { k: 'price', label: 'Price', cls: 'price' }],
     fields: [{ k: 'name', label: 'Title' }, { k: 'category_id', label: 'Category', type: 'select', options: catOpts },
       { k: 'description', label: 'Description', type: 'html', req: false },
-      { k: 'min_qty', label: 'Min. Quantity (e.g. 10 TON, Booking, 50 Kg)', req: false, attr: 'maxlength="100"' }, { k: 'price', label: 'Price (e.g. ₹85 / Kg)' }] },
+      { k: 'min_qty', label: 'Min. Quantity (select from list or type your own)', type: 'combo', options: qtyOpts, req: false, attr: 'maxlength="100"' }, { k: 'price', label: 'Price (e.g. ₹85 / Kg)' }] },
   about: { page: 'about', title: 'About Us' },
   contact: { page: 'contact', title: 'Contact Us' },
   users: { title: 'Users', res: 'users', edit: true, cols: [{ k: 'name', label: 'Name' }, { k: 'username', label: 'Username' }, { k: 'mobile', label: 'Mobile' }, { k: 'email', label: 'Email' }, { k: 'gst', label: 'GST' }, { k: 'role', label: 'Role', pill: 1 }],
@@ -53,7 +57,7 @@ const dashboard = async () => {
   const root = $('#m');
   try {
     const [c, p, u] = await Promise.all([api('categories'), api('products'), me.role === 'admin' ? api('users') : null]);
-    cats = c; catsStale = false;
+    cats = c; catsStale = false; rememberQty(p);
     const card = (go, n, label, cls) => `<button class="stat ${cls}" data-go="${go}"><b>${n}</b><span>${label}</span></button>`;
     const catName = id => c.find(x => x.id == id)?.name ?? '';
     root.innerHTML = `<div class="bar"><h2>Welcome, ${esc(me.name)}</h2></div>
