@@ -70,10 +70,17 @@ td .btn.sm{margin-right:4px}
 
 /* modal + toast */
 .modal{position:fixed;inset:0;background:#000b;display:grid;place-items:center;z-index:20;overflow:auto;padding:16px}
-.modal form{margin:0;width:min(440px,100%)}
+.modal form{margin:0;width:min(440px,100%);max-height:calc(100vh - 32px);overflow:auto;align-content:start;padding-bottom:0}
 .modal form.wide{width:min(660px,100%)}
-.modal h3{margin:0 0 4px;font-size:1.2rem;font-weight:650}
+.modal form.cols{width:min(840px,100%);grid-template-columns:1fr 1fr;column-gap:16px}
+.modal form.cols h3,.modal form.cols .field,.modal form.cols .row{grid-column:1/-1}
+.modal h3{margin:0 0 2px;font-size:1.2rem;font-weight:650}
+.modal .ed-body{min-height:110px;max-height:24vh}
+.modal .ed-bar{padding:6px}
 .row{display:flex;gap:10px}
+/* Save / Cancel stay visible even if the form has to scroll on a small screen */
+.modal form .row{position:sticky;bottom:0;background:var(--card);padding:14px 0 18px;border-top:1px solid var(--line)}
+.modal form .row .btn{flex:1}
 .toast{position:fixed;bottom:24px;right:24px;background:var(--green);color:#06210f;padding:11px 18px;border-radius:10px;z-index:30;font-weight:650}
 .toast.err{background:var(--danger);color:#fff}
 
@@ -101,6 +108,7 @@ td .btn.sm{margin-right:4px}
   aside .btn.ghost{width:auto;flex:1 1 auto;justify-content:center;order:3;padding:9px 10px;gap:8px}
   aside #out{margin-top:0}
   main{padding:18px 14px;overflow-x:auto}
+  .modal form.cols{grid-template-columns:1fr}
   th,td{padding:10px}
 }
 
