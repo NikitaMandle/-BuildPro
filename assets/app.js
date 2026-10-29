@@ -67,16 +67,19 @@ function crud(root, c) {
       : x.plain ? esc(plainText(r[x.k], x.plain))
       : x.pill ? (v ? `<span class="pill p-${String(r[x.k]).replace(/\W/g, '')}">${esc(v)}</span>` : '')
       : esc(v);
-    return `<td${x.cls ? ` class="${x.cls}"` : ''}>${h}</td>`;
+    return `<td${x.cls ? ` class="${x.cls}"` : ''}>${h || '<span class="dim">—</span>'}</td>`;
   };
+  const rowText = r => c.cols.map(x => x.plain ? plainText(r[x.k], 999) : x.map ? x.map(r[x.k]) : r[x.k]).join(' ').toLowerCase();
   function draw() {
     root.innerHTML = `<div class="bar"><h2>${c.title} <span class="count">${list.length}</span></h2>
+      <input id="q" class="search" type="search" placeholder="Search…" autocomplete="off">
       ${c.filter ? `<select id="f"><option value="">All</option>${c.filter.options().map(o => `<option value="${o.id}" ${o.id == fv ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>` : ''}
       ${c.edit ? '<button class="btn" id="add">+ Add</button>' : ''}</div>
-      <table><tr>${c.cols.map(x => `<th>${x.label}</th>`).join('')}${c.edit ? '<th></th>' : ''}</tr>
-      ${list.map(r => `<tr>${c.cols.map(x => cell(x, r)).join('')}
-      ${c.edit ? `<td><button class="btn sm ghost" data-e="${r.id}">Edit</button> <button class="btn sm" data-d="${r.id}">Delete</button></td>` : ''}</tr>`).join('')}
+      <table><tr>${c.cols.map(x => `<th>${x.label}</th>`).join('')}${c.edit ? '<th class="act"></th>' : ''}</tr>
+      ${list.map(r => `<tr data-s="${esc(rowText(r))}">${c.cols.map(x => cell(x, r)).join('')}
+      ${c.edit ? `<td class="act"><button class="btn sm ghost" data-e="${r.id}">Edit</button> <button class="btn sm" data-d="${r.id}">Delete</button></td>` : ''}</tr>`).join('')}
       ${list.length ? '' : `<tr><td class="empty" colspan="${c.cols.length + (c.edit ? 1 : 0)}">Nothing added yet</td></tr>`}</table>`;
+    $('#q', root).oninput = e => { const q = e.target.value.trim().toLowerCase(); root.querySelectorAll('tr[data-s]').forEach(tr => tr.hidden = !tr.dataset.s.includes(q)); };
     if (c.filter) $('#f', root).onchange = e => { fv = e.target.value; load(); };
     if (c.edit) { $('#add', root).onclick = () => form();
       root.querySelectorAll('[data-e]').forEach(b => b.onclick = () => form(list.find(r => r.id == b.dataset.e)));
