@@ -55,11 +55,11 @@ Fields: `category_id` (required), `name` (the product **title**, required), `des
 | DELETE | `products/{id}` | Delete product |
 
 ## 5. Pages (About Us / Contact Us)
-Content is **HTML** from the admin editor (sanitized, same allowed tags as product description). Slugs: `about`, `contact`.
+Content is **HTML** from the admin editor (sanitized, same allowed tags as product description). Slugs: `about`, `contact_address`, `contact_phone`, `contact_email`, and `contact` (read-only convenience copy: Address + Phone + Email combined, rebuilt automatically whenever one of the three is saved).
 | Method | path | Description |
 |---|---|---|
-| GET | `pages` | Both pages: `[{slug, content, updated_at}, ...]` (**public**, no login needed) |
-| GET | `pages/about` · `pages/contact` | One page (**public**); `content` is `""` until it is first saved |
+| GET | `pages` | All pages: `[{slug, content, updated_at}, ...]` (**public**, no login needed) |
+| GET | `pages/about` · `pages/contact_address` · `pages/contact_phone` · `pages/contact_email` · `pages/contact` | One page (**public**); `content` is `""` until it is first saved |
 | PUT | `pages/{slug}` | Save — field `content` (multipart with `_method=PUT`, or JSON). admin, subadmin only |
 
 ## Errors

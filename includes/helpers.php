@@ -231,7 +231,10 @@ function ensure_products_schema() {
 }
 
 // Editable site pages (About Us / Contact Us): one row per slug, content is sanitized HTML.
-const PAGE_SLUGS = ['about','contact'];
+const PAGE_SLUGS = ['about','contact','contact_address','contact_phone','contact_email'];
+// Contact Us is edited as 3 separate HTML editors (one DB row each). 'contact' is kept as a
+// combined copy (rebuilt automatically) so older apps that read pages/contact keep working.
+const CONTACT_PARTS = ['contact_address'=>'Address','contact_phone'=>'Phone','contact_email'=>'Email'];
 function ensure_pages_table() {
   static $done = false; if ($done) return; $done = true;
   db()->exec("CREATE TABLE IF NOT EXISTS pages (
@@ -246,4 +249,12 @@ function page_get($slug) {
 }
 function page_save($slug, $html) {
   db()->prepare('INSERT INTO pages(slug,content) VALUES(?,?) ON DUPLICATE KEY UPDATE content=VALUES(content)')->execute([$slug, $html]);
+}
+function contact_rebuild() {
+  $o = '';
+  foreach (CONTACT_PARTS as $slug => $label) {
+    $c = page_get($slug)['content'] ?? '';
+    if ($c !== '') $o .= "<h3>$label</h3>$c";
+  }
+  page_save('contact', $o);
 }

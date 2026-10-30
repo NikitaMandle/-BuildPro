@@ -48,7 +48,7 @@ $dispatch = function () use ($res, $id, $sub, $m) {
       resource('categories', ['admin','subadmin'], '*', fn($in,$u) => clean($in,$u,['name']), [], $id, $m);
 
     case 'pages':
-      // About Us / Contact Us. Read is public (mobile app shows them before login); edit = admin + subadmin.
+      // About Us / Contact Us (address, phone, email). Read is public (mobile app shows them before login); edit = admin + subadmin.
       ensure_pages_table();
       if ($sub !== '' && !in_array($sub, PAGE_SLUGS, true)) fail('Not found', 404);
       if ($m === 'GET') ok($sub === '' ? array_map('page_get', PAGE_SLUGS) : page_get($sub));
@@ -57,6 +57,7 @@ $dispatch = function () use ($res, $id, $sub, $m) {
       if ($sub === '') fail('Page slug required (about or contact)', 422);
       $in = input();
       page_save($sub, sanitize_html($in['content'] ?? ''));
+      if (isset(CONTACT_PARTS[$sub])) contact_rebuild(); // keep combined 'contact' page in sync
       ok(page_get($sub));
 
     case 'products':

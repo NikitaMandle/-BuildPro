@@ -46,7 +46,7 @@ const views = {
       { k: 'description', label: 'Description', type: 'html', req: false },
       { k: 'min_qty', label: 'Min. Quantity', type: 'combo', options: qtyOpts, req: false, attr: 'maxlength="100"' }, { k: 'price', label: 'Price (e.g. ₹85 / Kg)' }] },
   about: { page: 'about', title: 'About Us' },
-  contact: { page: 'contact', title: 'Contact Us' },
+  contact: { pages: [{ slug: 'contact_address', label: 'Address', ph: 'Write address…' }, { slug: 'contact_phone', label: 'Phone Number', ph: 'Write phone number(s)…' }, { slug: 'contact_email', label: 'Email ID', ph: 'Write email id(s)…' }], title: 'Contact Us' },
   users: { title: 'Users', one: 'User', res: 'users', edit: true, cols: [{ k: 'name', label: 'Name' }, { k: 'username', label: 'Username' }, { k: 'mobile', label: 'Mobile' }, { k: 'email', label: 'Email' }, { k: 'gst', label: 'GST' }, { k: 'role', label: 'Role', pill: 1 }],
     fields: [{ k: 'name', label: 'Name' }, { k: 'username', label: 'Username (used to log in)', attr: 'pattern="[A-Za-z][A-Za-z0-9_.]{2,29}" minlength="3" maxlength="30" autocomplete="off"' },
       { k: 'mobile', label: 'Mobile (10 digits)', attr: 'pattern="\\d{10}" maxlength="10"' }, { k: 'email', label: 'Email', type: 'email' },
@@ -73,7 +73,7 @@ const show = async k => {
   $('#m').innerHTML = '<p>Loading…</p>';
   try { if (k === 'prods' && catsStale) await refreshCats(); } catch (e) { return $('#m').innerHTML = `<p style="color:#ff5470">${esc(e.message)}</p>`; }
   const v = views[k];
-  if (v.dash) dashboard(); else if (v.page) pageEditor($('#m'), v.page, v.title, canEdit); else crud($('#m'), v);
+  if (v.dash) dashboard(); else if (v.pages) multiPageEditor($('#m'), v.title, v.pages, canEdit); else if (v.page) pageEditor($('#m'), v.page, v.title, canEdit); else crud($('#m'), v);
 };
 document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
 $('#out').onclick = async () => { await api('auth/logout', 'POST'); location.reload(); };

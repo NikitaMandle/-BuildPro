@@ -54,6 +54,21 @@ async function pageEditor(root, slug, title, canEdit) {
     try { await api(`pages/${slug}`, 'PUT', new FormData(e.target)); toast('Saved'); }
     catch (err) { toast(err.message, 1); } };
 }
+// Contact Us: several HTML editors on one page (e.g. Address / Phone / Email), each saved to its own page slug.
+async function multiPageEditor(root, title, parts, canEdit) {   // parts = [{slug,label,ph}]
+  root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><p>Loading…</p>`;
+  let rows;
+  try { rows = await Promise.all(parts.map(p => api(`pages/${p.slug}`))); }
+  catch (e) { root.innerHTML = `<h2>${esc(title)}</h2><p style="color:#ff5470">${esc(e.message)}</p>`; return; }
+  if (!canEdit) { root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div>` + parts.map((p, i) => `<h3 class="sub">${esc(p.label)}</h3><div class="ed-body page-view">${rows[i].content || '<p>Nothing added yet.</p>'}</div>`).join(''); return; }
+  root.innerHTML = `<div class="bar"><h2>${esc(title)}</h2></div><form class="page-form">${parts.map((p, i) => htmlField({ k: p.slug, label: p.label, ph: p.ph || 'Write here…', noSpecs: 1 }, rows[i])).join('')}<div class="row"><button class="btn">Save</button></div></form>`;
+  const eds = [...root.querySelectorAll('.ed')]; eds.forEach(initEditor);
+  $('form', root).onsubmit = async e => { e.preventDefault();
+    try {
+      await Promise.all(parts.map((p, i) => { syncEditor(eds[i]); const fd = new FormData(); fd.append('content', $('input', eds[i]).value); return api(`pages/${p.slug}`, 'PUT', fd); }));
+      toast('Saved');
+    } catch (err) { toast(err.message, 1); } };
+}
 // Generic CRUD table + modal form. c = {title,res,cols,fields,edit,filter}
 function crud(root, c) {
   let list = [], fv = '';
