@@ -8,8 +8,10 @@ To send PUT/DELETE with multipart, POST with a `_method=PUT` field (the site's J
 **Roles:** `admin` (from `.env`), `subadmin`, `user`.
 | Action | admin | subadmin | user | public |
 |---|---|---|---|---|
-| View categories/products | ✅ | ✅ | ✅ | ❌ (login required) |
-| Add/Edit/Delete categories & products | ✅ | ✅ | ❌ | ❌ |
+| View categories/sub categories/products | ✅ | ✅ | ✅ | ❌ (login required) |
+| Add/Edit/Delete categories, sub categories & products | ✅ | ✅ | ❌ | ❌ |
+| View dashboard popup | ✅ | ✅ | ✅ | ❌ |
+| Edit dashboard popup | ✅ | ✅ | ❌ | ❌ |
 | View About Us / Contact Us pages | ✅ | ✅ | ✅ | ✅ |
 | Edit About Us / Contact Us pages | ✅ | ✅ | ❌ | ❌ |
 | Manage users (create subadmin/user) | ✅ | ❌ | ❌ | ❌ |
@@ -43,18 +45,39 @@ Fields: `name` (unique, required), `image` (file, optional JPG/PNG/WEBP ≤ 3MB)
 | PUT | `categories/{id}` | Update (multipart with `_method=PUT`, or JSON for name only) |
 | DELETE | `categories/{id}` | Delete category + its products + image |
 
-## 4. Products (write: admin, subadmin)
-Fields: `category_id` (required), `name` (the product **title**, required), `description` (optional **HTML** from the admin editor — already sanitized; allowed tags: `p br b strong i em u s ul ol li h2 h3 h4 blockquote a`), `min_qty` (optional, **free text** — number and/or words, e.g. `"10 TON"`, `"Booking"`, `"50 Kg"`, max 100 chars; send blank to clear), `price` (required, **free text**, e.g. `"₹85 / Kg"`, max 100 chars). No image/unit. Responses include `min_qty`.
+## 4. Sub Categories (write: admin, subadmin)
+Every sub category belongs to one category. Fields: `category_id` (required on create), `name` (required, max 120, unique inside its category). `category_id` cannot be changed on update.
+| Method | path | Description |
+|---|---|---|
+| GET | `subcategories` | List all (login required) |
+| GET | `subcategories&category_id=2` | **Sub categories of one category** (login required) |
+| GET | `subcategories/{id}` | Get one (login required) |
+| POST | `subcategories` | Create — `{"category_id":2,"name":"OPC 43 Grade"}` |
+| PUT | `subcategories/{id}` | Update name |
+| DELETE | `subcategories/{id}` | Delete sub category (its products stay; their `subcategory_id` becomes `null`) |
+
+## 5. Products (write: admin, subadmin)
+Fields: `subcategory_id` (required on create — the product is added under a **sub category**; `category_id` is **set automatically** from it, any `category_id` you send is ignored), `name` (the product **title**, required), `description` (optional **HTML** from the admin editor — already sanitized; allowed tags: `p br b strong i em u s ul ol li h2 h3 h4 blockquote a`), `min_qty` (optional, **free text** — number and/or words, e.g. `"10 TON"`, `"Booking"`, `"50 Kg"`, max 100 chars; send blank to clear), `price` (required, **free text**, e.g. `"₹85 / Kg"`, max 100 chars). No image/unit. Responses include `category_id`, `category_name`, `subcategory_id`, `subcategory_name` and `min_qty`. Products created before sub categories existed have `subcategory_id: null` until they are edited once.
 | Method | path | Description |
 |---|---|---|
 | GET | `products` | List all (login required) |
 | GET | `products&category_id=2` | **Category-wise list** (login required) |
+| GET | `products&subcategory_id=5` | **Sub category-wise list** (login required) |
 | GET | `products/{id}` | Get one (login required) |
-| POST | `products` | Create (JSON or form fields) |
+| POST | `products` | Create (JSON or form fields) — send `subcategory_id`, `name`, `price`, … |
 | PUT | `products/{id}` | Update |
 | DELETE | `products/{id}` | Delete product |
 
-## 5. Pages (About Us / Contact Us)
+## 6. Popup (dashboard popup — one single popup)
+Shown when the dashboard opens: an **image** + a **product**. Fields: `image` (file, optional JPG/PNG/WEBP ≤ 3MB), `product_id` (optional, blank = none), `active` (`1`/`0`), `remove_image` (`1` removes the current image). Send only what you want to change.
+| Method | path | Description |
+|---|---|---|
+| GET | `popup` | Current popup (login required): `{image, product_id, active, product:{id,name,description,min_qty,price,category_id,category_name,subcategory_id,subcategory_name}\|null, updated_at}`. Show it only if `active` is true and there is an `image` or `product`. |
+| PUT | `popup` | Save (multipart with `_method=PUT`, or JSON for product_id/active). admin, subadmin only |
+| DELETE | `popup` | Clear the popup (multipart/form `_method=DELETE`). admin, subadmin only |
+If the linked product is deleted, `product_id` becomes `null` (the popup stays).
+
+## 7. Pages (About Us / Contact Us)
 Content is **HTML** from the admin editor (sanitized, same allowed tags as product description). Slugs: `about`, `contact_address`, `contact_phone`, `contact_email`, and `contact` (read-only convenience copy: Address + Phone + Email combined, rebuilt automatically whenever one of the three is saved).
 | Method | path | Description |
 |---|---|---|

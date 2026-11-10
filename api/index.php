@@ -47,6 +47,35 @@ $dispatch = function () use ($res, $id, $sub, $m) {
     case 'categories':
       resource('categories', ['admin','subadmin'], '*', fn($in,$u) => clean($in,$u,['name']), [], $id, $m);
 
+    case 'subcategories':
+      // Sub categories: each belongs to ONE category. Read = any logged-in user; write = admin + subadmin.
+      resource('subcategories', ['admin','subadmin'], 'id,category_id,name,created_at', function ($in, $u) {
+        $d = clean($in, $u, ['category_id','name']);
+        if ($u) unset($d['category_id']); // a sub category cannot be moved to another category (its products would go out of sync)
+        if (isset($d['name']) && preg_match_all('/./us', $d['name']) > 120) fail('Name must be at most 120 characters', 422);
+        return $d;
+      }, ['category_id'], $id, $m);
+
+    case 'popup':
+      // Dashboard popup (single): image + product + active. Read = any logged-in user; write = admin + subadmin.
+      if ($m === 'GET') { require_role('admin','subadmin','user'); ok(popup_get()); }
+      require_role('admin','subadmin');
+      ensure_popup_schema();
+      if ($m === 'DELETE') { $o = popup_row(); delete_file($o['image'] ?? null); db()->exec('DELETE FROM popup WHERE id=1'); ok(popup_get()); }
+      if (!in_array($m, ['POST','PUT'], true)) fail('Method not allowed', 405);
+      $in = input(); $o = popup_row();
+      $img = $o['image'] ?? null; $pid = $o['product_id'] ?? null; $act = $o ? (int)$o['active'] : 1;
+      if (!empty($in['remove_image']) && $in['remove_image'] !== '0') { delete_file($img); $img = null; }
+      $img = upload_image('image', $img);               // a newly chosen file replaces the old one
+      if (array_key_exists('product_id', $in)) {
+        $v = trim((string)$in['product_id']);
+        if ($v === '') $pid = null;
+        else { $q = db()->prepare('SELECT id FROM products WHERE id=?'); $q->execute([(int)$v]); if (!$q->fetch()) fail('Invalid product', 422); $pid = (int)$v; }
+      }
+      if (array_key_exists('active', $in)) $act = in_array(strtolower((string)$in['active']), ['1','true','on','yes'], true) ? 1 : 0;
+      db()->prepare('INSERT INTO popup(id,image,product_id,active) VALUES(1,?,?,?) ON DUPLICATE KEY UPDATE image=VALUES(image), product_id=VALUES(product_id), active=VALUES(active)')->execute([$img, $pid, $act]);
+      ok(popup_get());
+
     case 'pages':
       // About Us / Contact Us (address, phone, email). Read is public (mobile app shows them before login); edit = admin + subadmin.
       ensure_pages_table();
@@ -62,8 +91,16 @@ $dispatch = function () use ($res, $id, $sub, $m) {
 
     case 'products':
       if ($m !== 'GET') ensure_products_schema();
-      resource('products', ['admin','subadmin'], 'id,category_id,name,description,min_qty,price,created_at', function ($in, $u) {
-        $d = clean($in, $u, ['category_id','name']);
+      // category_name / subcategory_name are included so apps don't need extra calls
+      resource('products', ['admin','subadmin'], 'id,category_id,subcategory_id,(SELECT c.name FROM categories c WHERE c.id=products.category_id) AS category_name,(SELECT s.name FROM subcategories s WHERE s.id=products.subcategory_id) AS subcategory_name,name,description,min_qty,price,created_at', function ($in, $u) {
+        // A product is added under a SUB category; its category is taken from that sub category automatically.
+        $d = clean($in, $u, ['subcategory_id','name']);
+        unset($d['category_id']);
+        if (isset($d['subcategory_id'])) {
+          $q = db()->prepare('SELECT category_id FROM subcategories WHERE id=?'); $q->execute([(int)$d['subcategory_id']]);
+          $s = $q->fetch() ?: fail('Invalid sub category', 422);
+          $d['subcategory_id'] = (int)$d['subcategory_id']; $d['category_id'] = (int)$s['category_id'];
+        }
         // description (rich HTML, sanitized) and price (free text) may be sent blank to clear them
         if (array_key_exists('description', $in)) $d['description'] = sanitize_html($in['description']);
         if (array_key_exists('price', $in)) $d['price'] = trim((string)$in['price']);
@@ -73,7 +110,7 @@ $dispatch = function () use ($res, $id, $sub, $m) {
         if (!$u && !isset($d['price'])) fail('price is required', 422);
         if (isset($d['price']) && preg_match_all('/./us', $d['price']) > 100) fail('Price must be at most 100 characters', 422);
         return $d;
-      }, ['category_id'], $id, $m);
+      }, ['category_id','subcategory_id'], $id, $m);
 
     default: fail('Unknown resource', 404);
   }
@@ -90,8 +127,16 @@ try {
       // Older database without products.min_qty: add it once, then retry the same request
       ensure_products_schema();
       $dispatch();
+    } elseif (($e->getCode()==='42S22' && stripos($e->getMessage(), 'subcategory_id') !== false)
+           || ($e->getCode()==='42S02' && stripos($e->getMessage(), 'subcategories') !== false)) {
+      // Older database without Sub Categories: create the table + products.subcategory_id once, then retry
+      ensure_subcategories_schema();
+      $dispatch();
+    } elseif ($e->getCode()==='42S02' && stripos($e->getMessage(), 'popup') !== false) {
+      ensure_popup_schema();
+      $dispatch();
     } else throw $e;
   }
 } catch (PDOException $e) {
-  fail($e->getCode()==='23000' ? ($res==='users' ? 'Username or mobile already exists' : 'Duplicate value or invalid category') : 'Database error: '.$e->getMessage(), 422);
+  fail($e->getCode()==='23000' ? ($res==='users' ? 'Username or mobile already exists' : ($res==='subcategories' ? 'This sub category already exists in that category (or the category is invalid)' : 'Duplicate value or invalid category')) : 'Database error: '.$e->getMessage(), 422);
 }

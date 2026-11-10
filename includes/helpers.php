@@ -2,8 +2,9 @@
 // ---------- Reusable helpers ----------
 const TABLES = [
   'users'      => ['name','username','mobile','email','gst','pin_hash','role'],
-  'categories' => ['name','image'],
-  'products'   => ['category_id','name','description','min_qty','price'],
+  'categories'    => ['name','image'],
+  'subcategories' => ['category_id','name'],
+  'products'      => ['category_id','subcategory_id','name','description','min_qty','price'],
 ];
 
 function env($k, $d = null) {
@@ -228,6 +229,53 @@ function ensure_products_schema() {
   $cols = []; foreach ($q->fetchAll() as $r) $cols[strtolower($r['c'])] = strtolower($r['t']);
   if (isset($cols['price']) && !in_array($cols['price'], ['varchar','text'])) db()->exec("ALTER TABLE products MODIFY price VARCHAR(100) NOT NULL DEFAULT ''");
   if (!isset($cols['min_qty'])) db()->exec("ALTER TABLE products ADD COLUMN min_qty VARCHAR(100) NOT NULL DEFAULT '' AFTER description");
+}
+
+// One-time, automatic upgrade for Sub Categories:
+//  - creates the `subcategories` table (each sub category belongs to one category)
+//  - adds products.subcategory_id (a product now picks a SUB category; its category is derived from it)
+// Old products keep working: they simply have no sub category until you edit them once.
+function ensure_subcategories_schema() {
+  static $done = false; if ($done) return; $done = true;
+  db()->exec("CREATE TABLE IF NOT EXISTS subcategories (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    category_id INT NOT NULL,
+    name VARCHAR(120) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE KEY uq_sub_name (category_id, name),
+    FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci");
+  $has = db()->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'subcategory_id'")->fetchColumn();
+  if (!$has) db()->exec("ALTER TABLE products ADD COLUMN subcategory_id INT NULL AFTER category_id,
+    ADD CONSTRAINT fk_products_subcategory FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL");
+}
+
+// Dashboard popup: ONE row (id=1) = image + linked product + on/off. Table is created automatically.
+function ensure_popup_schema() {
+  static $done = false; if ($done) return; $done = true;
+  ensure_subcategories_schema();
+  db()->exec("CREATE TABLE IF NOT EXISTS popup (
+    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+    image VARCHAR(255) NULL,
+    product_id INT NULL,
+    active TINYINT(1) NOT NULL DEFAULT 1,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
+  ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci");
+}
+function popup_row() {
+  ensure_popup_schema();
+  return db()->query('SELECT image,product_id,active,updated_at FROM popup WHERE id=1')->fetch() ?: null;
+}
+// Popup + its product details (what the dashboard / mobile app needs to show it)
+function popup_get() {
+  $r = popup_row() ?? ['image'=>null,'product_id'=>null,'active'=>0,'updated_at'=>null];
+  $prod = null;
+  if ($r['product_id']) {
+    $q = db()->prepare('SELECT id,category_id,subcategory_id,(SELECT c.name FROM categories c WHERE c.id=products.category_id) AS category_name,(SELECT s.name FROM subcategories s WHERE s.id=products.subcategory_id) AS subcategory_name,name,description,min_qty,price FROM products WHERE id=?');
+    $q->execute([(int)$r['product_id']]); $prod = $q->fetch() ?: null;
+  }
+  return ['image'=>$r['image'], 'product_id'=>$r['product_id'] ? (int)$r['product_id'] : null, 'active'=>(bool)$r['active'], 'product'=>$prod, 'updated_at'=>$r['updated_at']];
 }
 
 // Editable site pages (About Us / Contact Us): one row per slug, content is sanitized HTML.

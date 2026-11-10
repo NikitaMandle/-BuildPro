@@ -98,13 +98,13 @@ function crud(root, c) {
     if (c.filter) $('#f', root).onchange = e => { fv = e.target.value; load(); };
     if (c.edit) { $('#add', root).onclick = () => form();
       root.querySelectorAll('[data-e]').forEach(b => b.onclick = () => form(list.find(r => r.id == b.dataset.e)));
-      root.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { if (!confirm('Delete?')) return;
+      root.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { if (!confirm(c.delMsg || 'Delete?')) return;
         try { await api(`${c.res}/${b.dataset.d}`, 'DELETE'); toast('Deleted'); c.onChange?.(); load(); } catch (e) { toast(e.message, 1); } }); }
   }
   function form(row = {}) {
     const m = document.createElement('div'); m.className = 'modal';
     m.innerHTML = `<form class="card${c.fields.length > 2 ? ' wide cols' : ''}"><h3>${row.id ? 'Edit' : 'Add'} ${c.one || c.title}</h3>${c.fields.map(f => f.type === 'html' ? htmlField(f, row) : `<label>${f.label}${
-      f.type === 'select' ? `<select name="${f.k}" required>${f.options().map(o => `<option value="${o.id}" ${o.id == row[f.k] ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
+      f.type === 'select' ? `<select name="${f.k}" required ${f.lock && row.id ? 'disabled' : ''}>${f.ph ? `<option value="">${esc(f.ph)}</option>` : ''}${f.options().map(o => `<option value="${o.id}" ${o.id == row[f.k] ? 'selected' : ''}>${esc(o.name)}</option>`).join('')}</select>`
       : f.type === 'file' ? `<input type="file" name="${f.k}" accept="image/*">`
       : f.type === 'combo' ? `<input name="${f.k}" list="dl-${f.k}" ${f.attr || ''} autocomplete="off" placeholder="Select or type…" value="${esc(row[f.k])}" ${f.req === false ? '' : 'required'}><datalist id="dl-${f.k}">${f.options().map(o => `<option value="${esc(o)}">`).join('')}</datalist>`
       : `<input name="${f.k}" type="${f.type || 'text'}" ${f.attr || ''} value="${f.type === 'password' ? '' : esc(row[f.k])}" ${f.req === false || (row.id && f.type === 'password') ? '' : 'required'}>`}</label>`).join('')}
