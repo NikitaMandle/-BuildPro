@@ -57,24 +57,30 @@ $dispatch = function () use ($res, $id, $sub, $m) {
       }, ['category_id'], $id, $m);
 
     case 'popup':
-      // Dashboard popup (single): image + product + active. Read = any logged-in user; write = admin + subadmin.
-      if ($m === 'GET') { require_role('admin','subadmin','user'); ok(popup_get()); }
-      require_role('admin','subadmin');
-      ensure_popup_schema();
-      if ($m === 'DELETE') { $o = popup_row(); delete_file($o['image'] ?? null); db()->exec('DELETE FROM popup WHERE id=1'); ok(popup_get()); }
-      if (!in_array($m, ['POST','PUT'], true)) fail('Method not allowed', 405);
-      $in = input(); $o = popup_row();
-      $img = $o['image'] ?? null; $pid = $o['product_id'] ?? null; $act = $o ? (int)$o['active'] : 1;
-      if (!empty($in['remove_image']) && $in['remove_image'] !== '0') { delete_file($img); $img = null; }
-      $img = upload_image('image', $img);               // a newly chosen file replaces the old one
-      if (array_key_exists('product_id', $in)) {
-        $v = trim((string)$in['product_id']);
-        if ($v === '') $pid = null;
-        else { $q = db()->prepare('SELECT id FROM products WHERE id=?'); $q->execute([(int)$v]); if (!$q->fetch()) fail('Invalid product', 422); $pid = (int)$v; }
-      }
-      if (array_key_exists('active', $in)) $act = in_array(strtolower((string)$in['active']), ['1','true','on','yes'], true) ? 1 : 0;
-      db()->prepare('INSERT INTO popup(id,image,product_id,active) VALUES(1,?,?,?) ON DUPLICATE KEY UPDATE image=VALUES(image), product_id=VALUES(product_id), active=VALUES(active)')->execute([$img, $pid, $act]);
-      ok(popup_get());
+      // Read-only: the popup to show on the dashboard / mobile app = newest ACTIVE popup. Any logged-in user.
+      if ($m !== 'GET') fail('Use the popups resource to add / edit / delete popups', 405);
+      require_role('admin','subadmin','user'); ok(popup_get());
+
+    case 'popups':
+      // Popup manager (full CRUD): title + image + product + active. Read = any logged-in user; write = admin + subadmin.
+      if ($m !== 'GET') ensure_popup_schema();
+      resource('popups', ['admin','subadmin'], 'id,title,image,product_id,(SELECT p.name FROM products p WHERE p.id=popups.product_id) AS product_name,active,created_at,updated_at', function ($in, $u) {
+        $d = [];
+        if (array_key_exists('title', $in)) {
+          $t = trim((string)$in['title']);
+          if (preg_match_all('/./us', $t) > 150) fail('Title must be at most 150 characters', 422);
+          $d['title'] = $t === '' ? null : $t;
+        }
+        if (array_key_exists('product_id', $in)) {          // blank = no product
+          $v = trim((string)$in['product_id']);
+          if ($v === '') $d['product_id'] = null;
+          else { $q = db()->prepare('SELECT id FROM products WHERE id=?'); $q->execute([(int)$v]); if (!$q->fetch()) fail('Invalid product', 422); $d['product_id'] = (int)$v; }
+        }
+        if (array_key_exists('active', $in)) $d['active'] = in_array(strtolower((string)$in['active']), ['1','true','on','yes'], true) ? 1 : 0;
+        elseif (!$u) $d['active'] = 1;
+        if (!$u && (empty($_FILES['image']) || $_FILES['image']['error'] === UPLOAD_ERR_NO_FILE)) fail('Image is required', 422);
+        return $d;
+      }, [], $id, $m);
 
     case 'pages':
       // About Us / Contact Us (address, phone, email). Read is public (mobile app shows them before login); edit = admin + subadmin.

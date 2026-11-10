@@ -11,7 +11,7 @@ To send PUT/DELETE with multipart, POST with a `_method=PUT` field (the site's J
 | View categories/sub categories/products | ✅ | ✅ | ✅ | ❌ (login required) |
 | Add/Edit/Delete categories, sub categories & products | ✅ | ✅ | ❌ | ❌ |
 | View dashboard popup | ✅ | ✅ | ✅ | ❌ |
-| Edit dashboard popup | ✅ | ✅ | ❌ | ❌ |
+| Add/Edit/Delete popups (Popup tab) | ✅ | ✅ | ❌ | ❌ |
 | View About Us / Contact Us pages | ✅ | ✅ | ✅ | ✅ |
 | Edit About Us / Contact Us pages | ✅ | ✅ | ❌ | ❌ |
 | Manage users (create subadmin/user) | ✅ | ❌ | ❌ | ❌ |
@@ -68,13 +68,16 @@ Fields: `subcategory_id` (required on create — the product is added under a **
 | PUT | `products/{id}` | Update |
 | DELETE | `products/{id}` | Delete product |
 
-## 6. Popup (dashboard popup — one single popup)
-Shown when the dashboard opens: an **image** + a **product**. Fields: `image` (file, optional JPG/PNG/WEBP ≤ 3MB), `product_id` (optional, blank = none), `active` (`1`/`0`), `remove_image` (`1` removes the current image). Send only what you want to change.
+## 6. Popup (Admin > Popup tab: full CRUD, many popups)
+Each popup has: `title` (optional, ≤150 chars), `image` (file, **required on create**, JPG/PNG/WEBP ≤ 3MB), `product_id` (optional, blank = none), `active` (`1`/`0`). On update send only what you want to change (a new `image` replaces the old file).
 | Method | path | Description |
 |---|---|---|
-| GET | `popup` | Current popup (login required): `{image, product_id, active, product:{id,name,description,min_qty,price,category_id,category_name,subcategory_id,subcategory_name}\|null, updated_at}`. Show it only if `active` is true and there is an `image` or `product`. |
-| PUT | `popup` | Save (multipart with `_method=PUT`, or JSON for product_id/active). admin, subadmin only |
-| DELETE | `popup` | Clear the popup (multipart/form `_method=DELETE`). admin, subadmin only |
+| GET | `popups` | List all popups (login required): `[{id,title,image,product_id,product_name,active,created_at,updated_at}]`, newest first |
+| GET | `popups/{id}` | Get one |
+| POST | `popups` | Create (multipart). admin, subadmin only |
+| PUT | `popups/{id}` | Update (multipart with `_method=PUT`). admin, subadmin only |
+| DELETE | `popups/{id}` | Delete (also deletes its image file). admin, subadmin only |
+| GET | `popup` | **The popup to show on the dashboard / mobile app** = the newest ACTIVE popup (login required): `{id, title, image, product_id, active, product:{id,name,description,min_qty,price,category_id,category_name,subcategory_id,subcategory_name}\\|null, updated_at}`. Show it only if `active` is true and there is an `image` or `product`. Read-only (write calls return 405). |
 If the linked product is deleted, `product_id` becomes `null` (the popup stays).
 
 ## 7. Pages (About Us / Contact Us)

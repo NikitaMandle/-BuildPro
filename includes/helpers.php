@@ -5,6 +5,7 @@ const TABLES = [
   'categories'    => ['name','image'],
   'subcategories' => ['category_id','name'],
   'products'      => ['category_id','subcategory_id','name','description','min_qty','price'],
+  'popups'        => ['title','image','product_id','active'],
 ];
 
 function env($k, $d = null) {
@@ -250,32 +251,38 @@ function ensure_subcategories_schema() {
     ADD CONSTRAINT fk_products_subcategory FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL");
 }
 
-// Dashboard popup: ONE row (id=1) = image + linked product + on/off. Table is created automatically.
+// Dashboard popups: many rows (title + image + linked product + on/off), managed in Admin > Popup (full CRUD).
+// Table is created automatically. An older single-row `popup` table is copied into `popups` once, then removed.
 function ensure_popup_schema() {
   static $done = false; if ($done) return; $done = true;
   ensure_subcategories_schema();
-  db()->exec("CREATE TABLE IF NOT EXISTS popup (
-    id TINYINT UNSIGNED NOT NULL PRIMARY KEY,
+  db()->exec("CREATE TABLE IF NOT EXISTS popups (
+    id INT AUTO_INCREMENT PRIMARY KEY,
+    title VARCHAR(150) NULL,
     image VARCHAR(255) NULL,
     product_id INT NULL,
     active TINYINT(1) NOT NULL DEFAULT 1,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (product_id) REFERENCES products(id) ON DELETE SET NULL
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci");
+  $old = db()->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'popup'")->fetchColumn();
+  if ($old) {
+    db()->exec("INSERT INTO popups(image,product_id,active) SELECT image,product_id,active FROM popup WHERE image IS NOT NULL OR product_id IS NOT NULL");
+    db()->exec("DROP TABLE popup");
+  }
 }
-function popup_row() {
-  ensure_popup_schema();
-  return db()->query('SELECT image,product_id,active,updated_at FROM popup WHERE id=1')->fetch() ?: null;
-}
-// Popup + its product details (what the dashboard / mobile app needs to show it)
+// The popup shown on the dashboard / in the mobile app: the newest ACTIVE popup + its product details
 function popup_get() {
-  $r = popup_row() ?? ['image'=>null,'product_id'=>null,'active'=>0,'updated_at'=>null];
+  ensure_popup_schema();
+  $r = db()->query('SELECT id,title,image,product_id,active,updated_at FROM popups WHERE active=1 ORDER BY id DESC LIMIT 1')->fetch();
+  if (!$r) return ['id'=>null,'title'=>null,'image'=>null,'product_id'=>null,'active'=>false,'product'=>null,'updated_at'=>null];
   $prod = null;
   if ($r['product_id']) {
     $q = db()->prepare('SELECT id,category_id,subcategory_id,(SELECT c.name FROM categories c WHERE c.id=products.category_id) AS category_name,(SELECT s.name FROM subcategories s WHERE s.id=products.subcategory_id) AS subcategory_name,name,description,min_qty,price FROM products WHERE id=?');
     $q->execute([(int)$r['product_id']]); $prod = $q->fetch() ?: null;
   }
-  return ['image'=>$r['image'], 'product_id'=>$r['product_id'] ? (int)$r['product_id'] : null, 'active'=>(bool)$r['active'], 'product'=>$prod, 'updated_at'=>$r['updated_at']];
+  return ['id'=>(int)$r['id'], 'title'=>$r['title'], 'image'=>$r['image'], 'product_id'=>$r['product_id'] ? (int)$r['product_id'] : null, 'active'=>true, 'product'=>$prod, 'updated_at'=>$r['updated_at']];
 }
 
 // Editable site pages (About Us / Contact Us): one row per slug, content is sanitized HTML.
