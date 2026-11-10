@@ -27,7 +27,7 @@ $('#f').onsubmit = async e => { e.preventDefault();
 
 <script src="../assets/app.js"></script><script>
 const me = <?= json_encode($me, JSON_HEX_TAG | JSON_HEX_AMP) ?>;
-let cats = [], subs = [], prodList = [], catsStale = true;
+let cats = [], subs = [], catsStale = true;
 // Min. Quantity suggestions: a few defaults + every value already used on a product (anything else can still be typed)
 const qtySeen = new Set(), QTY_DEFAULT = ['Booking', 'Booking Price', '1 TON', '5 TON', '10 TON', '9 m.t.', '50 Kg', '100 Kg'];
 const qtyOpts = () => [...new Set([...QTY_DEFAULT, ...qtySeen])];
@@ -51,12 +51,7 @@ const views = {
     fields: [{ k: 'name', label: 'Title' }, { k: 'subcategory_id', label: 'Sub Category', type: 'select', options: subOpts, ph: 'Select sub category…' },
       { k: 'description', label: 'Description', type: 'html', req: false },
       { k: 'min_qty', label: 'Min. Quantity', type: 'combo', options: qtyOpts, req: false, attr: 'maxlength="100"' }, { k: 'price', label: 'Price (e.g. ₹85 / Kg)' }] },
-  popups: { title: 'Popups', one: 'Popup', res: 'popups', edit: canEdit, delMsg: 'Delete this popup?',
-    cols: [{ k: 'image', label: 'Image', img: 1 }, { k: 'title', label: 'Title' }, { k: 'product_name', label: 'Product', pill: 1 }, { k: 'active', label: 'Status', pill: 1, map: v => v == 1 ? 'Active' : 'Inactive' }],
-    fields: [{ k: 'title', label: 'Title (optional)', req: false, attr: 'maxlength="150"' },
-      { k: 'product_id', label: 'Product', type: 'select', options: () => prodList.map(x => ({ id: x.id, name: prodLabel(x) })), ph: '— No product —', req: false },
-      { k: 'active', label: 'Status', type: 'select', options: () => [{ id: 1, name: 'Active (show on dashboard)' }, { id: 0, name: 'Inactive' }] },
-      { k: 'image', label: 'Image (JPG/PNG/WEBP, max 3MB)', type: 'file', req: false }] },
+  popups: { popups: 1 },
   about: { page: 'about', title: 'About Us' },
   contact: { pages: [{ slug: 'contact_address', label: 'Address', ph: 'Write address…' }, { slug: 'contact_phone', label: 'Phone Number', ph: 'Write phone number(s)…' }, { slug: 'contact_email', label: 'Email ID', ph: 'Write email id(s)…' }], title: 'Contact Us' },
   users: { title: 'Users', one: 'User', res: 'users', edit: true, cols: [{ k: 'name', label: 'Name' }, { k: 'username', label: 'Username' }, { k: 'mobile', label: 'Mobile' }, { k: 'email', label: 'Email' }, { k: 'gst', label: 'GST' }, { k: 'role', label: 'Role', pill: 1 }],
@@ -82,21 +77,60 @@ const dashboard = async () => {
 const show = async k => {
   document.querySelectorAll('[data-t]').forEach(x => x.classList.toggle('active', x.dataset.t === k));
   $('#m').innerHTML = '<p>Loading…</p>';
-  try { if ((k === 'prods' || k === 'subs') && catsStale) await refreshCats(); if (k === 'popups') prodList = await api('products'); } catch (e) { return $('#m').innerHTML = `<p style="color:#ff5470">${esc(e.message)}</p>`; }
+  try { if ((k === 'prods' || k === 'subs') && catsStale) await refreshCats(); } catch (e) { return $('#m').innerHTML = `<p style="color:#ff5470">${esc(e.message)}</p>`; }
   const v = views[k];
-  if (v.dash) dashboard(); else if (v.pages) multiPageEditor($('#m'), v.title, v.pages, canEdit); else if (v.page) pageEditor($('#m'), v.page, v.title, canEdit); else crud($('#m'), v);
+  if (v.dash) dashboard(); else if (v.popups) popupManager($('#m')); else if (v.pages) multiPageEditor($('#m'), v.title, v.pages, canEdit); else if (v.page) pageEditor($('#m'), v.page, v.title, canEdit); else crud($('#m'), v);
 };
 document.querySelectorAll('[data-t]').forEach(b => b.onclick = () => show(b.dataset.t));
-// ---------- Dashboard popup: shows the newest ACTIVE popup once when the dashboard opens (read-only). Manage popups in the "Popup" tab. ----------
+// ---------- Popup tab: image cards + Add / Edit / Delete (only an image and a product dropdown) ----------
 const prodLabel = p => `${p.name}${p.category_name ? ` (${p.category_name}${p.subcategory_name ? ' › ' + p.subcategory_name : ''})` : ''}`;
+async function popupManager(root) {
+  let list, prods;
+  try { [list, prods] = await Promise.all([api('popups'), api('products')]); }
+  catch (e) { root.innerHTML = `<h2>Popup</h2><p style="color:#ff5470">${esc(e.message)}</p>`; return; }
+  const live = list.find(r => r.active == 1);        // the dashboard shows the newest active popup
+  const reload = async () => { try { list = await api('popups'); } catch (e) { return toast(e.message, 1); } draw(); };
+  function draw() {
+    const lv = list.find(r => r.active == 1);
+    root.innerHTML = `<div class="bar"><h2>Popup <span class="count">${list.length}</span></h2>${canEdit ? '<button class="btn" id="add">+ Add Popup</button>' : ''}</div>
+      ${list.length ? `<div class="pgrid">${list.map(r => `<div class="pcard"><div class="pimg">${r.image ? `<img src="${esc(asset(r.image))}" alt="">` : '<span>No image</span>'}</div>
+        <div class="pbody"><div><h4>${esc(r.product_name || 'No product linked')}</h4>${lv && lv.id === r.id ? '<span class="pill live">Showing on dashboard</span>' : ''}</div>
+        ${canEdit ? `<div class="row"><button class="btn sm ghost" data-e="${r.id}">Edit</button><button class="btn sm" data-d="${r.id}">Delete</button></div>` : ''}</div></div>`).join('')}</div>`
+        : '<div class="pempty">No popup yet. Click <b>+ Add Popup</b> to add an image and a product.</div>'}`;
+    if (!canEdit) return;
+    $('#add', root).onclick = () => form();
+    root.querySelectorAll('[data-e]').forEach(b => b.onclick = () => form(list.find(r => r.id == b.dataset.e)));
+    root.querySelectorAll('[data-d]').forEach(b => b.onclick = async () => { if (!confirm('Delete this popup?')) return;
+      try { await api(`popups/${b.dataset.d}`, 'DELETE'); toast('Deleted'); reload(); } catch (e) { toast(e.message, 1); } });
+  }
+  function form(row = {}) {
+    const m = document.createElement('div'); m.className = 'modal';
+    m.innerHTML = `<form class="card"><h3>${row.id ? 'Edit' : 'Add'} Popup</h3>
+      <div class="upl"><div class="prev">${row.image ? `<img src="${esc(asset(row.image))}" alt="">` : '<span>No image selected</span>'}</div>
+        <label class="btn ghost">${row.image ? 'Change image' : 'Choose image'}<input type="file" name="image" accept="image/png,image/jpeg,image/webp" hidden></label>
+        <small>JPG / PNG / WEBP, max 3 MB</small></div>
+      <label class="field">Product<select name="product_id"><option value="">— No product —</option>${prods.map(x => `<option value="${x.id}" ${x.id == row.product_id ? 'selected' : ''}>${esc(prodLabel(x))}</option>`).join('')}</select></label>
+      <div class="row"><button class="btn">Save</button><button type="button" class="btn ghost" id="x">Cancel</button></div></form>`;
+    document.body.append(m); $('#x', m).onclick = () => m.remove();
+    const inp = $('input[type=file]', m);
+    inp.onchange = () => { const f = inp.files[0]; if (!f) return; $('.prev', m).innerHTML = `<img src="${URL.createObjectURL(f)}" alt="">`; };
+    $('form', m).onsubmit = async e => { e.preventDefault();
+      const fd = new FormData(e.target); if (!fd.get('image')?.size) fd.delete('image');
+      if (!row.id && !fd.has('image')) return toast('Please choose an image', 1);
+      try { await api(row.id ? `popups/${row.id}` : 'popups', row.id ? 'PUT' : 'POST', fd); m.remove(); toast('Saved'); reload(); }
+      catch (err) { toast(err.message, 1); } };
+  }
+  draw();
+}
+// ---------- Dashboard popup: shows the newest ACTIVE popup once when the dashboard opens (read-only) ----------
 function showPopup(p) {
-  const m = document.createElement('div'); m.className = 'modal'; const pr = p.product, head = p.title || pr?.name;
+  const m = document.createElement('div'); m.className = 'modal'; const pr = p.product;
   m.innerHTML = `<div class="card pop"><button type="button" class="pop-x" aria-label="Close">×</button>
     ${p.image ? `<img src="${esc(asset(p.image))}" alt="">` : ''}
-    <div class="pop-body">${head ? `<h3>${esc(head)}</h3>` : ''}
-      ${pr ? `<div class="pop-meta">${pr.category_name ? `<span class="pill">${esc(pr.category_name)}</span>` : ''}${pr.subcategory_name ? `<span class="pill">${esc(pr.subcategory_name)}</span>` : ''}${pr.min_qty ? `<span>Min. Qty: ${esc(pr.min_qty)}</span>` : ''}</div>
-        ${pr.price ? `<div class="price">${esc(pr.price)}</div>` : ''}
-        ${plainText(pr.description, 160) ? `<p>${esc(plainText(pr.description, 160))}</p>` : ''}` : ''}
+    <div class="pop-body">${pr ? `<h3>${esc(pr.name)}</h3>
+        <div class="pop-meta">${pr.category_name ? `<span class="pill">${esc(pr.category_name)}</span>` : ''}${pr.subcategory_name ? `<span class="pill">${esc(pr.subcategory_name)}</span>` : ''}${pr.min_qty ? `<span class="pop-qty">Min. Qty: ${esc(pr.min_qty)}</span>` : ''}</div>
+        ${pr.price ? `<div class="pop-price">${esc(pr.price)}</div>` : ''}
+        ${plainText(pr.description, 140) ? `<p>${esc(plainText(pr.description, 140))}</p>` : ''}` : ''}
       <div class="row">${pr ? '<button type="button" class="btn" id="pgo">View Products</button>' : ''}<button type="button" class="btn ghost" id="pcl">Close</button></div></div></div>`;
   const onKey = e => { if (e.key === 'Escape') close(); };
   const close = () => { m.remove(); document.removeEventListener('keydown', onKey); };

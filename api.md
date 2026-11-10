@@ -69,7 +69,7 @@ Fields: `subcategory_id` (required on create — the product is added under a **
 | DELETE | `products/{id}` | Delete product |
 
 ## 6. Popup (Admin > Popup tab: full CRUD, many popups)
-Each popup has: `title` (optional, ≤150 chars), `image` (file, **required on create**, JPG/PNG/WEBP ≤ 3MB), `product_id` (optional, blank = none), `active` (`1`/`0`). On update send only what you want to change (a new `image` replaces the old file).
+The admin panel sends only `image` + `product_id`. Each popup has: `title` (optional, unused by the panel, ≤150 chars), `image` (file, **required on create**, JPG/PNG/WEBP ≤ 3MB), `product_id` (optional, blank = none), `active` (`1`/`0`). On update send only what you want to change (a new `image` replaces the old file).
 | Method | path | Description |
 |---|---|---|
 | GET | `popups` | List all popups (login required): `[{id,title,image,product_id,product_name,active,created_at,updated_at}]`, newest first |
