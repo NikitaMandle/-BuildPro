@@ -48,8 +48,9 @@ $dispatch = function () use ($res, $id, $sub, $m) {
       resource('categories', ['admin','subadmin'], '*', fn($in,$u) => clean($in,$u,['name']), [], $id, $m);
 
     case 'subcategories':
-      // Sub categories: each belongs to ONE category. Read = any logged-in user; write = admin + subadmin.
-      resource('subcategories', ['admin','subadmin'], 'id,category_id,name,created_at', function ($in, $u) {
+      // Sub categories: each belongs to ONE category and has an optional image. Read = any logged-in user; write = admin + subadmin.
+      if ($m !== 'GET') ensure_subcategories_schema(); // adds subcategories.image on an older database BEFORE the upload/insert
+      resource('subcategories', ['admin','subadmin'], 'id,category_id,name,image,created_at', function ($in, $u) {
         $d = clean($in, $u, ['category_id','name']);
         if ($u) unset($d['category_id']); // a sub category cannot be moved to another category (its products would go out of sync)
         if (isset($d['name']) && preg_match_all('/./us', $d['name']) > 120) fail('Name must be at most 120 characters', 422);
@@ -134,6 +135,7 @@ try {
       ensure_products_schema();
       $dispatch();
     } elseif (($e->getCode()==='42S22' && stripos($e->getMessage(), 'subcategory_id') !== false)
+           || ($e->getCode()==='42S22' && $res==='subcategories' && stripos($e->getMessage(), 'image') !== false)
            || ($e->getCode()==='42S02' && stripos($e->getMessage(), 'subcategories') !== false)) {
       // Older database without Sub Categories: create the table + products.subcategory_id once, then retry
       ensure_subcategories_schema();

@@ -3,7 +3,7 @@
 const TABLES = [
   'users'      => ['name','username','mobile','email','gst','pin_hash','role'],
   'categories'    => ['name','image'],
-  'subcategories' => ['category_id','name'],
+  'subcategories' => ['category_id','name','image'],
   'products'      => ['category_id','subcategory_id','name','description','min_qty','price'],
   'popups'        => ['title','image','product_id','active'],
 ];
@@ -242,10 +242,14 @@ function ensure_subcategories_schema() {
     id INT AUTO_INCREMENT PRIMARY KEY,
     category_id INT NOT NULL,
     name VARCHAR(120) NOT NULL,
+    image VARCHAR(255) NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     UNIQUE KEY uq_sub_name (category_id, name),
     FOREIGN KEY (category_id) REFERENCES categories(id) ON DELETE CASCADE
   ) ENGINE=InnoDB DEFAULT CHARSET=utf8 COLLATE=utf8_general_ci");
+  // older subcategories table (created before images existed): add the image column once
+  $hasImg = db()->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'subcategories' AND COLUMN_NAME = 'image'")->fetchColumn();
+  if (!$hasImg) db()->exec("ALTER TABLE subcategories ADD COLUMN image VARCHAR(255) NULL AFTER name");
   $has = db()->query("SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = 'products' AND COLUMN_NAME = 'subcategory_id'")->fetchColumn();
   if (!$has) db()->exec("ALTER TABLE products ADD COLUMN subcategory_id INT NULL AFTER category_id,
     ADD CONSTRAINT fk_products_subcategory FOREIGN KEY (subcategory_id) REFERENCES subcategories(id) ON DELETE SET NULL");

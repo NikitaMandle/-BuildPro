@@ -46,15 +46,15 @@ Fields: `name` (unique, required), `image` (file, optional JPG/PNG/WEBP ≤ 3MB)
 | DELETE | `categories/{id}` | Delete category + its products + image |
 
 ## 4. Sub Categories (write: admin, subadmin)
-Every sub category belongs to one category. Fields: `category_id` (required on create), `name` (required, max 120, unique inside its category). `category_id` cannot be changed on update.
+Every sub category belongs to one category. Fields: `category_id` (required on create), `name` (required, max 120, unique inside its category), `image` (optional file — JPG/PNG/WEBP, max 3 MB; send as **multipart/form-data**). `category_id` cannot be changed on update. Responses include `id, category_id, name, image, created_at` (`image` is a path like `uploads/ab12cd34.jpg`, or `null`).
 | Method | path | Description |
 |---|---|---|
 | GET | `subcategories` | List all (login required) |
 | GET | `subcategories&category_id=2` | **Sub categories of one category** (login required) |
 | GET | `subcategories/{id}` | Get one (login required) |
-| POST | `subcategories` | Create — `{"category_id":2,"name":"OPC 43 Grade"}` |
-| PUT | `subcategories/{id}` | Update name |
-| DELETE | `subcategories/{id}` | Delete sub category (its products stay; their `subcategory_id` becomes `null`) |
+| POST | `subcategories` | Create (multipart) — fields `category_id`, `name`, optional file `image` |
+| PUT | `subcategories/{id}` | Update (multipart with `_method=PUT`) — `name` and/or new `image` (old image file is replaced) |
+| DELETE | `subcategories/{id}` | Delete sub category (also deletes its image file; its products stay and their `subcategory_id` becomes `null`) |
 
 ## 5. Products (write: admin, subadmin)
 Fields: `subcategory_id` (required on create — the product is added under a **sub category**; `category_id` is **set automatically** from it, any `category_id` you send is ignored), `name` (the product **title**, required), `description` (optional **HTML** from the admin editor — already sanitized; allowed tags: `p br b strong i em u s ul ol li h2 h3 h4 blockquote a`), `min_qty` (optional, **free text** — number and/or words, e.g. `"10 TON"`, `"Booking"`, `"50 Kg"`, max 100 chars; send blank to clear), `price` (required, **free text**, e.g. `"₹85 / Kg"`, max 100 chars). No image/unit. Responses include `category_id`, `category_name`, `subcategory_id`, `subcategory_name` and `min_qty`. Products created before sub categories existed have `subcategory_id: null` until they are edited once.
